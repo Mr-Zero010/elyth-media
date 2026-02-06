@@ -120,7 +120,8 @@ button{cursor:pointer}
   <input id="uploadTitle" type="text" placeholder="Title (video or model)" />
   <textarea id="uploadDescription" placeholder="Description" rows="2"></textarea>
   <!-- now accept .glb/.gltf in addition to video -->
-  <input id="uploadFile" type="file" accept="video/*,.glb,.gltf" />
+  <input id="uploadVideo" type="file" accept="video/*" />
+<input id="uploadModel" type="file" accept=".glb,.gltf" />
   <button id="uploadSubmit" class="btn">Upload</button>
   <small id="uploadStatus"></small>
 </div>
@@ -860,3 +861,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
