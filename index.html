@@ -480,41 +480,43 @@ function load3DViewer(modelUrl) {
 
 
 async function uploadToR2(file) {
-  if (!currentUser) {
-    throw new Error("Not signed in");
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Not authenticated");
   }
 
+  // FORCE a fresh token
+  const token = await user.getIdToken(true);
 
- const token = await auth.currentUser.getIdToken(true);
-
+  if (!token) {
+    throw new Error("Failed to get Firebase token");
+  }
 
   const safeName =
-    Date.now() + "_" + (file.name || "file").replace(/\s+/g, "");
-
+    Date.now() + "_" + (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "");
 
   const res = await fetch(R2_UPLOAD_ENDPOINT, {
     method: "POST",
     headers: {
-      "Authorization": "Bearer " + token, // THIS LINE
+      "Authorization": "Bearer " + token,
       "x-filename": safeName,
       "Content-Type": file.type || "application/octet-stream"
     },
     body: file
   });
 
-
   if (!res.ok) {
-    throw new Error("Upload failed");
+    const text = await res.text();
+    throw new Error("Worker upload failed: " + res.status + " " + text);
   }
 
-
   const data = await res.json();
-return {
-  url: data.url,
-  key: data.key
-};
-}
 
+  return {
+    url: data.url,
+    key: data.key
+  };
+}
 
 /* ------------- Upload logic: FINAL VERSION ------------- */
 uploadSubmit.addEventListener('click', async () => {
@@ -861,4 +863,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
 
