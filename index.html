@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>elyth — Home</title>
 
-
 <meta name="description" content="Watch tutorials and videos on MyVideo. Sign in, upload, follow creators, and discover content.">
-
 
 <style>
 :root{
@@ -56,32 +54,39 @@ button{cursor:pointer}
 .desc{margin:0;color:var(--muted);font-size:14px}
 .meta .small{color:var(--muted);font-size:13px;margin-top:6px}
 /* Upload Panel */
-#uploadPanel{display:none;flex-direction:column;gap:6px;margin-left:16px;max-width:320px;position:fixed;bottom:90px;right:20px;background:var(--card);padding:12px;border-radius:var(--radius);box-shadow:var(--shadow);z-index:1000}
+#uploadPanel{display:none;flex-direction:column;gap:6px;margin-left:16px;max-width:320px;position:fixed;bottom:90px;right:20px;background:var(--card);padding:12px;border-radius:var(--radius);box-shadow:var(--shadow)}
 #uploadPanel input,#uploadPanel textarea{padding:6px;border-radius:6px;border:1px solid #ccc;font-size:14px;font-family:inherit}
 #uploadStatus{color:var(--muted);font-size:13px;min-height:18px}
 /* Floating upload button */
-#fabUpload{position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:var(--blue);border-radius:50%;color:white;font-size:32px;line-height:52px;text-align:center;cursor:pointer;box-shadow:0 4px 12px rgba(11,114,255,0.5);user-select:none;z-index:1100}
+#fabUpload{position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:var(--blue);border-radius:50%;color:white;font-size:32px;line-height:52px;text-align:center;cursor:pointer;box-shadow:0 4px 12px rgba(11, 198, 255, 0.3)}
 #fabUpload:hover{box-shadow:0 6px 18px rgba(11, 198, 255, 0.8);transform:scale(1.05);transition: transform 0.15s ease}
 /* User page */
 .user-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .user-header img{width:80px;height:80px;border-radius:50%}
 .follow-count{color:var(--muted);font-size:14px;margin-left:8px}
 
+/* VIDEO PAGE LAYOUT */
+.video-page{padding:12px;max-width:100%}
+.video-section{margin-bottom:24px}
+.video-player-container{width:100%;max-height:480px;border-radius:10px;overflow:hidden;background:#000;margin:12px 0}
+.video-player-container video{width:100%;height:auto;display:block}
+
+.model-section{margin-top:24px;padding-top:24px;border-top:1px solid #e5e7eb}
+.model-section h3{margin:0 0 12px 0;color:var(--blue);font-size:18px;font-weight:600}
+
+.no-model-message{color:var(--muted);padding:20px;text-align:center;background:#f9fafb;border-radius:10px;font-size:14px}
 
 /* 3D viewer within video page */
-#viewer3d { width:100%; height:420px; background:#111; border-radius:10px; overflow:hidden; }
+#viewer3d{width:100%;height:420px;background:#111;border-radius:10px;overflow:hidden}
 </style>
-
 
 <!-- Three.js and examples (global THREE) for the in-page viewer -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/loaders/GLTFLoader.js"></script>
 
-
 </head>
 <body>
-
 
 <div class="app">
   <header>
@@ -90,18 +95,15 @@ button{cursor:pointer}
       elyth
     </div>
 
-
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="Search videos..." />
       <button id="searchBtn">🔍</button>
     </div>
 
-
     <div class="top-actions">
       <button id="authBtn" class="btn">Sign in</button>
     </div>
   </header>
-
 
   <div id="contentArea">
     <div class="list" id="videoList">
@@ -110,31 +112,20 @@ button{cursor:pointer}
   </div>
 </div>
 
-
 <!-- Floating Upload Button -->
 <div id="fabUpload" title="Upload Video or Model" aria-label="Upload">+</div>
-
 
 <!-- Upload Panel -->
 <div id="uploadPanel">
   <input id="uploadTitle" type="text" placeholder="Title (video or model)" />
   <textarea id="uploadDescription" placeholder="Description" rows="2"></textarea>
-  <!-- now accept .glb/.gltf in addition to video -->
   <input id="uploadVideo" type="file" accept="video/*" />
-<input id="uploadModel" type="file" accept=".glb,.gltf" />
+  <input id="uploadModel" type="file" accept=".glb,.gltf" />
   <button id="uploadSubmit" class="btn">Upload</button>
   <small id="uploadStatus"></small>
 </div>
 
-
 <script type="module">
-/**
- * Integrated Elyth platform with in-video 3D viewer.
- * Replace FIREBASE_CONFIG values below with your own.
- */
-
-
-/* ---------- Firebase imports (ES modules) ---------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth,
@@ -143,7 +134,6 @@ import {
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
 
 import {
   getFirestore,
@@ -164,8 +154,6 @@ import {
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-
-/* ---------- CONFIG: replace with your Firebase config ---------- */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyD62Ox1iEF9yJ6OJiI-_KX6HO98A11pcg8",
   authDomain: "elyth-3e386.firebaseapp.com",
@@ -176,27 +164,19 @@ const FIREBASE_CONFIG = {
   measurementId: "G-KV2RMG0YMH"
 };
 
-
-/* ---------- Cloudflare R2 Upload Endpoint ---------- */
 const R2_UPLOAD_ENDPOINT = "https://elyth.zerogroupofficial00.workers.dev";
-
-
-/* --------------------------------------------------------------- */
-
 
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
-
-/* UI elements */
 const authBtn = document.getElementById('authBtn');
 const fabUpload = document.getElementById('fabUpload');
 const uploadPanel = document.getElementById('uploadPanel');
 const uploadTitle = document.getElementById('uploadTitle');
 const uploadDescription = document.getElementById('uploadDescription');
-const uploadFile = document.getElementById('uploadFile');
+const uploadVideo = document.getElementById('uploadVideo');
 const uploadModel = document.getElementById('uploadModel');
 const uploadSubmit = document.getElementById('uploadSubmit');
 const uploadStatus = document.getElementById('uploadStatus');
@@ -204,11 +184,8 @@ const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const contentArea = document.getElementById('contentArea');
 
-
 let currentUser = null;
 
-
-/* ---------- Auth ---------- */
 authBtn.addEventListener('click', async () => {
   if (!currentUser) {
     try {
@@ -225,13 +202,10 @@ authBtn.addEventListener('click', async () => {
   }
 });
 
-
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   authBtn.textContent = user ? (user.displayName || 'You') + ' (Sign out)' : 'Sign in';
 
-
-  // If user signed in create/merge a user doc
   if (user) {
     const userRef = doc(db, 'users', user.uid);
     const snap = await getDoc(userRef);
@@ -245,29 +219,21 @@ onAuthStateChanged(auth, async (user) => {
     await setDoc(userRef, userDoc, { merge: true });
   }
 
-
-  // keep upload button visible; user must be signed in to actually upload (checked on click)
   fabUpload.style.display = 'block';
 });
 
-
-/* ---------- Utility ---------- */
 function escapeHTML(s){ return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function getVideoList() {
   return document.getElementById('videoList');
 }
 
-
-/* ---------- Real-time videos feed ---------- */
 function renderVideos(videos) {
   getVideoList().innerHTML = '';
-
 
   if (videos.length === 0) {
     getVideoList().innerHTML = '<p style="color:#888;">No videos found.</p>';
     return;
   }
-
 
   videos.forEach(v => {
     const card = document.createElement('div');
@@ -281,33 +247,28 @@ function renderVideos(videos) {
       </div>
     `;
 
-
     card.querySelector('.thumb').addEventListener('click', () => loadVideoPage(v.id));
     card.querySelector('.title').addEventListener('click', () => loadVideoPage(v.id));
-
-
     card.querySelector('.video-owner').addEventListener('click', e => {
       e.preventDefault();
       loadUserPage(v.ownerId);
     });
 
-
     getVideoList().appendChild(card);
   });
 }
+
 const videosCol = collection(db, 'videos');
 const videosQuery = query(videosCol, orderBy('uploadDate', 'desc'));
-
 
 onSnapshot(videosQuery, snap => {
   const videos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderVideos(videos);
 });
-/* ---------- Search ---------- */
+
 function searchVideos() {
   const q = searchInput.value.toLowerCase();
   const cards = Array.from(getVideoList().children);
-
 
   cards.forEach(c => {
     const title = (c.querySelector('.title')?.textContent || '').toLowerCase();
@@ -315,69 +276,55 @@ function searchVideos() {
     c.style.display = (title.includes(q) || desc.includes(q)) ? 'flex' : 'none';
   });
 }
+
 searchBtn.addEventListener('click', searchVideos);
 searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') searchVideos(); });
 
-
-/* ---------- Upload panel toggle ---------- */
 fabUpload.addEventListener('click', () => {
   if (!currentUser) { alert('Sign in to upload'); return; }
   uploadPanel.style.display = uploadPanel.style.display === 'flex' ? 'none' : 'flex';
 });
 
-
-/* ---------- 3D viewer helper (uses global THREE) ---------- */
-/* Keeps track of previous instance for cleanup to avoid multiple renderers */
 let __threeInstance = null;
 
-
 function load3DViewer(modelUrl) {
-  // cleanup previous
   if (__threeInstance && __threeInstance.cleanup) {
     try { __threeInstance.cleanup(); } catch (e) { console.warn(e); }
     __threeInstance = null;
   }
 
-
   const container = document.getElementById('viewer3d');
   if (!container) return;
   container.innerHTML = '';
 
+  const width = container.clientWidth || 980;
+  const height = container.clientHeight || 420;
 
-  // create renderer, scene, camera
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio || 1);
-  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setSize(width, height);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
 
-
-  const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
   camera.position.set(0, 1.2, 3);
 
-
-  // lights
   const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 1.0);
   scene.add(hemi);
   const dir = new THREE.DirectionalLight(0xffffff, 0.6);
   dir.position.set(2, 4, 2);
   scene.add(dir);
 
-
-  // controls
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 0.5;
   controls.maxDistance = 8;
 
-
-  // loader
   const loader = new THREE.GLTFLoader();
   let mixer = null;
   let modelRoot = null;
-
 
   loader.load(modelUrl,
     gltf => {
@@ -387,24 +334,19 @@ function load3DViewer(modelUrl) {
         return;
       }
 
-
-      // center model if possible
-      // compute bounding box to scale/focus nicely
       try {
         const box = new THREE.Box3().setFromObject(modelRoot);
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         if (maxDim > 0) {
-          const scale = 1.6 / maxDim; // heuristic
+          const scale = 1.6 / maxDim;
           modelRoot.scale.setScalar(scale);
         }
         const center = box.getCenter(new THREE.Vector3());
-        modelRoot.position.sub(center); // center model on origin
+        modelRoot.position.sub(center);
       } catch (e) { /* ignore */ }
 
-
       scene.add(modelRoot);
-
 
       if (gltf.animations && gltf.animations.length > 0) {
         mixer = new THREE.AnimationMixer(modelRoot);
@@ -414,18 +356,13 @@ function load3DViewer(modelUrl) {
         });
       }
     },
-    xhr => {
-      // optional progress (could hook into UI later)
-      // console.log('model progress', (xhr.loaded / xhr.total * 100).toFixed(0) + '%');
-    },
+    xhr => {},
     err => {
       console.error('Failed to load model', err);
       container.innerHTML = '<div style="color:#fff;padding:18px">Failed to load 3D model</div>';
     }
   );
 
-
-  // responsive
   function onResize() {
     if (!container) return;
     const w = container.clientWidth;
@@ -435,7 +372,6 @@ function load3DViewer(modelUrl) {
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize', onResize);
-
 
   const clock = new THREE.Clock();
   let rafId = null;
@@ -448,14 +384,11 @@ function load3DViewer(modelUrl) {
   }
   animate();
 
-
-  // expose cleanup to remove event listeners and dispose renderer
   __threeInstance = {
     cleanup: () => {
       if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('resize', onResize);
       try {
-        // dispose scene geometries & materials (best-effort)
         scene.traverse(obj => {
           if (obj.geometry) obj.geometry.dispose?.();
           if (obj.material) {
@@ -473,11 +406,6 @@ function load3DViewer(modelUrl) {
     }
   };
 }
-// end of load3DViewer
-
-
-// >>> ADD THIS FUNCTION HERE <<<
-
 
 async function uploadToR2(file) {
   const user = auth.currentUser;
@@ -485,15 +413,12 @@ async function uploadToR2(file) {
     throw new Error("Not authenticated");
   }
 
-  // FORCE a fresh token
   const token = await user.getIdToken(true);
-
   if (!token) {
     throw new Error("Failed to get Firebase token");
   }
 
-  const safeName =
-    Date.now() + "_" + (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "");
+  const safeName = Date.now() + "_" + (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "");
 
   const res = await fetch(R2_UPLOAD_ENDPOINT, {
     method: "POST",
@@ -511,14 +436,12 @@ async function uploadToR2(file) {
   }
 
   const data = await res.json();
-
   return {
     url: data.url,
     key: data.key
   };
 }
 
-/* ------------- Upload logic: FINAL VERSION ------------- */
 uploadSubmit.addEventListener('click', async () => {
   try {
     if (!currentUser) {
@@ -550,7 +473,6 @@ uploadSubmit.addEventListener('click', async () => {
     let thumbnailUrl = "";
     let thumbnailKey = "";
 
-    /* ---------- VIDEO ---------- */
     if (videoFile) {
       uploadStatus.textContent = "Uploading video...";
       const video = await uploadToR2(videoFile);
@@ -572,7 +494,6 @@ uploadSubmit.addEventListener('click', async () => {
       } catch {}
     }
 
-    /* ---------- 3D MODEL ---------- */
     if (modelFile) {
       uploadStatus.textContent = "Uploading 3D model...";
       const model = await uploadToR2(modelFile);
@@ -580,14 +501,12 @@ uploadSubmit.addEventListener('click', async () => {
       modelKey = model.key;
     }
 
-    /* ---------- FIRESTORE ---------- */
     await addDoc(collection(db, "videos"), {
       title,
       description,
       ownerId: currentUser.uid,
       ownerName: currentUser.displayName || "Unknown",
       uploadDate: serverTimestamp(),
-
       videoUrl,
       videoKey,
       modelUrl,
@@ -609,27 +528,19 @@ uploadSubmit.addEventListener('click', async () => {
   }
 });
 
-/* ---------- User profile page ---------- */
 async function loadUserPage(userId) {
   contentArea.innerHTML = '<p>Loading user...</p>';
 
-
   const userDocRef = doc(db, 'users', userId);
   const snap = await getDoc(userDocRef);
-
 
   if (!snap.exists()) {
     contentArea.innerHTML = '<p>User not found</p>';
     return;
   }
 
-
   const user = snap.data();
-
-
-  let isFollowing =
-    currentUser && (user.followers || []).includes(currentUser.uid);
-
+  let isFollowing = currentUser && (user.followers || []).includes(currentUser.uid);
 
   contentArea.innerHTML = `
     <div style="padding:14px">
@@ -646,16 +557,13 @@ async function loadUserPage(userId) {
         </div>
       </div>
 
-
       <h3>Uploads</h3>
       <div id="userVideos"></div>
     </div>
   `;
 
-
   const followBtn = document.getElementById('followBtn');
   const followCountElem = document.getElementById('followCount');
-
 
   followBtn.addEventListener('click', async () => {
     if (!currentUser) {
@@ -663,9 +571,7 @@ async function loadUserPage(userId) {
       return;
     }
 
-
     const userRef = doc(db, 'users', userId);
-
 
     if (isFollowing) {
       await updateDoc(userRef, {
@@ -673,19 +579,16 @@ async function loadUserPage(userId) {
       });
       isFollowing = false;
       followBtn.textContent = 'Follow';
-      followCountElem.textContent =
-        (parseInt(followCountElem.textContent) - 1) + ' followers';
+      followCountElem.textContent = (parseInt(followCountElem.textContent) - 1) + ' followers';
     } else {
       await updateDoc(userRef, {
         followers: arrayUnion(currentUser.uid)
       });
       isFollowing = true;
       followBtn.textContent = 'Following';
-      followCountElem.textContent =
-        (parseInt(followCountElem.textContent) + 1) + ' followers';
+      followCountElem.textContent = (parseInt(followCountElem.textContent) + 1) + ' followers';
     }
   });
-
 
   const videosSnap = await getDocs(
     query(
@@ -695,10 +598,8 @@ async function loadUserPage(userId) {
     )
   );
 
-
   const userVideosDiv = document.getElementById('userVideos');
   userVideosDiv.innerHTML = '';
-
 
   videosSnap.docs.forEach(d => {
     const v = d.data();
@@ -710,21 +611,17 @@ async function loadUserPage(userId) {
         <h3 class="title">${escapeHTML(v.title)}</h3>
       </div>
     `;
-    card.querySelector('.title')
-      .addEventListener('click', () => loadVideoPage(d.id));
+    card.querySelector('.title').addEventListener('click', () => loadVideoPage(d.id));
     userVideosDiv.appendChild(card);
   });
 }
 
-
 /* ---------- Video page (video + optional inline 3D viewer) ---------- */
 async function loadVideoPage(videoId) {
-  // cleanup three if any (so we don't leak)
   if (__threeInstance && __threeInstance.cleanup) {
     try { __threeInstance.cleanup(); } catch (e) {}
     __threeInstance = null;
   }
-
 
   const videoDocRef = doc(db, 'videos', videoId);
   const videoSnap = await getDoc(videoDocRef);
@@ -733,15 +630,12 @@ async function loadVideoPage(videoId) {
     return;
   }
 
-
   const v = videoSnap.data();
   const isOwner = currentUser && currentUser.uid === v.ownerId;
 
-
-  contentArea.innerHTML = `
-    <div style="padding:12px">
+  let html = `
+    <div class="video-page">
       <h1>${escapeHTML(v.title)}</h1>
-
 
       ${isOwner ? `
         <button id="deleteVideoBtn"
@@ -750,118 +644,112 @@ async function loadVideoPage(videoId) {
         </button>
       ` : ''}
 
-
-      ${v.videoUrl ? `
-        <video id="videoPlayer" controls
-          style="width:100%;max-height:420px;border-radius:10px;margin:10px 0"
-          poster="${escapeHTML(v.thumbnailUrl || '')}">
-          <source src="${escapeHTML(v.videoUrl)}" type="video/mp4">
-        </video>
-      ` : ''}
-
-
-      ${v.modelUrl ? `
-        <div class="comment-section">
-          <h3 style="margin:6px 0 10px 0;color:var(--blue)">3D Model Preview</h3>
-          <div id="viewer3d"></div>
-        </div>
-      ` : ''}
-
-
       <p style="margin-top:12px">${escapeHTML(v.description || '')}</p>
       <p style="margin-top:8px">
         By <a href="#" id="videoOwner">${escapeHTML(v.ownerName || 'Unknown')}</a>
       </p>
-    </div>
   `;
-/* ---------- DELETE VIDEO LOGIC (FINAL) ---------- */
-const deleteBtn = document.getElementById("deleteVideoBtn");
 
+  // VIDEO SECTION
+  if (v.videoUrl) {
+    html += `
+      <div class="video-section">
+        <div class="video-player-container">
+          <video id="videoPlayer" controls
+            poster="${escapeHTML(v.thumbnailUrl || '')}">
+            <source src="${escapeHTML(v.videoUrl)}" type="video/mp4">
+          </video>
+        </div>
+      </div>
+    `;
+  }
 
-if (deleteBtn) {
-  deleteBtn.addEventListener("click", async () => {
-    if (!confirm("Delete this permanently?")) return;
-
-
-    try {
-      const token = await auth.currentUser.getIdToken(true);
-
-
-      const keys = [];
-      if (v.videoKey) keys.push(v.videoKey);
-      if (v.modelKey) keys.push(v.modelKey);
-      if (v.thumbnailKey) keys.push(v.thumbnailKey);
-
-
-      for (const key of keys) {
-        const res = await fetch(R2_UPLOAD_ENDPOINT, {
-          method: "DELETE",
-          headers: {
-            "Authorization": "Bearer " + token,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ key })
-        });
-
-
-        if (!res.ok) {
-          throw new Error("R2 delete failed: " + key);
-        }
-      }
-
-
-      await deleteDoc(doc(db, "videos", videoId));
-      alert("Deleted");
-      goHome();
-
-
-    } catch (err) {
-      console.error(err);
-      alert("Delete failed: " + err.message);
-    }
-  });
-}
-/* ---------- END DELETE VIDEO LOGIC ---------- */
-
-
-  // wire owner link
-  const ownerLink = document.getElementById('videoOwner');
-  if (ownerLink) ownerLink.addEventListener('click', e => { e.preventDefault(); loadUserPage(v.ownerId); });
-
-
-  // initialize 3D viewer if model exists
+  // 3D MODEL SECTION
   if (v.modelUrl) {
-    load3DViewer(v.modelUrl);
+    html += `
+      <div class="model-section">
+        <h3>🎨 3D Model Viewer</h3>
+        <div id="viewer3d"></div>
+      </div>
+    `;
+  } else if (v.videoUrl) {
+    // Only show "not available" if there's a video but NO model
+    html += `
+      <div class="model-section">
+        <div class="no-model-message">
+          📦 3D Model not available for this video
+        </div>
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  contentArea.innerHTML = html;
+
+  /* ---------- DELETE VIDEO LOGIC ---------- */
+  const deleteBtn = document.getElementById("deleteVideoBtn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      if (!confirm("Delete this permanently?")) return;
+
+      try {
+        const token = await auth.currentUser.getIdToken(true);
+        const keys = [];
+        if (v.videoKey) keys.push(v.videoKey);
+        if (v.modelKey) keys.push(v.modelKey);
+        if (v.thumbnailKey) keys.push(v.thumbnailKey);
+
+        for (const key of keys) {
+          const res = await fetch(R2_UPLOAD_ENDPOINT, {
+            method: "DELETE",
+            headers: {
+              "Authorization": "Bearer " + token,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ key })
+          });
+
+          if (!res.ok) {
+            throw new Error("R2 delete failed: " + key);
+          }
+        }
+
+        await deleteDoc(doc(db, "videos", videoId));
+        alert("Deleted");
+        goHome();
+
+      } catch (err) {
+        console.error(err);
+        alert("Delete failed: " + err.message);
+      }
+    });
+  }
+
+  // Wire owner link
+  const ownerLink = document.getElementById('videoOwner');
+  if (ownerLink) {
+    ownerLink.addEventListener('click', e => {
+      e.preventDefault();
+      loadUserPage(v.ownerId);
+    });
+  }
+
+  // Initialize 3D viewer if model exists
+  if (v.modelUrl) {
+    setTimeout(() => {
+      load3DViewer(v.modelUrl);
+    }, 100);
   }
 }
 
-
-/* ---------- Navigation: go home (renders list is realtime) ---------- */
 function goHome() {
-  // the real-time listener is already rendering feed, just clear contentArea and leave the feed visible
   contentArea.innerHTML = `<div class="list" id="videoList"></div>`;
-  // Reassign videoList to the new element and re-render current snapshot quickly by reusing existing onSnapshot
-  // (For simplicity we reload page feed by relying on onSnapshot registered earlier.)
-  // In our structure videoList points to the original element; if it's replaced, we rebind:
-  const maybe = document.getElementById('videoList');
-  if (maybe) {
-    // update the reference used by renderVideos
-    // but since we're using the outer-scoped videoList, we should reassign
-    // (this usually won't be necessary because the feed stays in the DOM; keep here for safety)
-    // Note: we won't re-register onSnapshot to avoid duplicates
-  }
 }
 
-
-/* ---------- initial home load (optional) ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  // Nothing special needed — real-time feed is active via onSnapshot earlier
+  // Nothing special needed
 });
 
-
-/* ---------- End of script ---------- */
 </script>
 </body>
 </html>
-
-
