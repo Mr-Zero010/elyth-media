@@ -297,114 +297,122 @@ function load3DViewer(modelUrl) {
   if (!container) return;
   container.innerHTML = '';
 
-  const width = container.clientWidth || 980;
-  const height = container.clientHeight || 420;
+  // Force the container to have actual size
+  container.style.width = '100%';
+  container.style.height = '420px';
+  container.style.display = 'block';
 
-  const scene = new THREE.Scene();
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
-  renderer.setSize(width, height);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  container.appendChild(renderer.domElement);
+  // Get actual dimensions with a small delay for layout
+  setTimeout(() => {
+    const width = Math.max(container.clientWidth, 300) || 980;
+    const height = Math.max(container.clientHeight, 300) || 420;
 
-  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-  camera.position.set(0, 1.2, 3);
+    const scene = new THREE.Scene();
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(width, height);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.appendChild(renderer.domElement);
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 1.0);
-  scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
-  dir.position.set(2, 4, 2);
-  scene.add(dir);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    camera.position.set(0, 1.2, 3);
 
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.minDistance = 0.5;
-  controls.maxDistance = 8;
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 1.0);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir.position.set(2, 4, 2);
+    scene.add(dir);
 
-  const loader = new THREE.GLTFLoader();
-  let mixer = null;
-  let modelRoot = null;
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 0.5;
+    controls.maxDistance = 8;
 
-  loader.load(modelUrl,
-    gltf => {
-      modelRoot = gltf.scene || gltf.scenes?.[0];
-      if (!modelRoot) {
-        console.error('GLTF loaded but contains no scene.');
-        return;
-      }
+    const loader = new THREE.GLTFLoader();
+    let mixer = null;
+    let modelRoot = null;
 
-      try {
-        const box = new THREE.Box3().setFromObject(modelRoot);
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        if (maxDim > 0) {
-          const scale = 1.6 / maxDim;
-          modelRoot.scale.setScalar(scale);
+    loader.load(modelUrl,
+      gltf => {
+        modelRoot = gltf.scene || gltf.scenes?.[0];
+        if (!modelRoot) {
+          console.error('GLTF loaded but contains no scene.');
+          return;
         }
-        const center = box.getCenter(new THREE.Vector3());
-        modelRoot.position.sub(center);
-      } catch (e) { /* ignore */ }
 
-      scene.add(modelRoot);
-
-      if (gltf.animations && gltf.animations.length > 0) {
-        mixer = new THREE.AnimationMixer(modelRoot);
-        gltf.animations.forEach((clip) => {
-          const action = mixer.clipAction(clip);
-          action.play();
-        });
-      }
-    },
-    xhr => {},
-    err => {
-      console.error('Failed to load model', err);
-      container.innerHTML = '<div style="color:#fff;padding:18px">Failed to load 3D model</div>';
-    }
-  );
-
-  function onResize() {
-    if (!container) return;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    renderer.setSize(w, h);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  window.addEventListener('resize', onResize);
-
-  const clock = new THREE.Clock();
-  let rafId = null;
-  function animate() {
-    rafId = requestAnimationFrame(animate);
-    const dt = clock.getDelta();
-    if (mixer) mixer.update(dt);
-    controls.update();
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  __threeInstance = {
-    cleanup: () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', onResize);
-      try {
-        scene.traverse(obj => {
-          if (obj.geometry) obj.geometry.dispose?.();
-          if (obj.material) {
-            if (Array.isArray(obj.material)) {
-              obj.material.forEach(m => { if (m.map) m.map.dispose?.(); m.dispose?.(); });
-            } else {
-              if (obj.material.map) obj.material.map.dispose?.();
-              obj.material.dispose?.();
-            }
+        try {
+          const box = new THREE.Box3().setFromObject(modelRoot);
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          if (maxDim > 0) {
+            const scale = 1.6 / maxDim;
+            modelRoot.scale.setScalar(scale);
           }
-        });
-      } catch (e) { /* ignore */ }
-      try { renderer.dispose(); } catch (e) {}
-      if (container) container.innerHTML = '';
+          const center = box.getCenter(new THREE.Vector3());
+          modelRoot.position.sub(center);
+        } catch (e) { /* ignore */ }
+
+        scene.add(modelRoot);
+
+        if (gltf.animations && gltf.animations.length > 0) {
+          mixer = new THREE.AnimationMixer(modelRoot);
+          gltf.animations.forEach((clip) => {
+            const action = mixer.clipAction(clip);
+            action.play();
+          });
+        }
+      },
+      xhr => {},
+      err => {
+        console.error('Failed to load model', err);
+        container.innerHTML = '<div style="color:#fff;padding:18px">Failed to load 3D model</div>';
+      }
+    );
+
+    function onResize() {
+      if (!container) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
     }
-  };
+    window.addEventListener('resize', onResize);
+
+    const clock = new THREE.Clock();
+    let rafId = null;
+    function animate() {
+      rafId = requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+      if (mixer) mixer.update(dt);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    __threeInstance = {
+      cleanup: () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        window.removeEventListener('resize', onResize);
+        try {
+          scene.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose?.();
+            if (obj.material) {
+              if (Array.isArray(obj.material)) {
+                obj.material.forEach(m => { if (m.map) m.map.dispose?.(); m.dispose?.(); });
+              } else {
+                if (obj.material.map) obj.material.map.dispose?.();
+                obj.material.dispose?.();
+              }
+            }
+          });
+        } catch (e) { /* ignore */ }
+        try { renderer.dispose(); } catch (e) {}
+        if (container) container.innerHTML = '';
+      }
+    };
+  }, 200);
 }
 
 async function uploadToR2(file) {
