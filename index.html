@@ -58,7 +58,7 @@ button{cursor:pointer}
 #uploadPanel input,#uploadPanel textarea{padding:6px;border-radius:6px;border:1px solid #ccc;font-size:14px;font-family:inherit}
 #uploadStatus{color:var(--muted);font-size:13px;min-height:18px}
 /* Floating upload button */
-#fabUpload{position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:var(--blue);border-radius:50%;color:white;font-size:32px;line-height:52px;text-align:center;cursor:pointer;box-shadow:0 2px 8px rgba(11,198,255,0.4)}
+#fabUpload{position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:var(--blue);border-radius:50%;color:white;font-size:32px;line-height:52px;text-align:center;cursor:pointer;box-shadow:0 4px 12px rgba(11, 198, 255, 0.3)}
 #fabUpload:hover{box-shadow:0 6px 18px rgba(11, 198, 255, 0.8);transform:scale(1.05);transition: transform 0.15s ease}
 /* User page */
 .user-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
@@ -297,143 +297,114 @@ function load3DViewer(modelUrl) {
   if (!container) return;
   container.innerHTML = '';
 
-  // Force the container to have actual size
-  container.style.width = '100%';
-  container.style.height = '420px';
-  container.style.display = 'block';
+  const width = container.clientWidth || 980;
+  const height = container.clientHeight || 420;
 
-  // Get actual dimensions with a small delay for layout
-  setTimeout(() => {
-    const width = Math.max(container.clientWidth, 300) || 980;
-    const height = Math.max(container.clientHeight, 300) || 420;
+  const scene = new THREE.Scene();
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
+  renderer.setSize(width, height);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
 
-    const scene = new THREE.Scene();
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio || 1);
-    renderer.setSize(width, height);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    container.appendChild(renderer.domElement);
+  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+  camera.position.set(0, 1.2, 3);
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 1.2, 3);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 1.0);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  dir.position.set(2, 4, 2);
+  scene.add(dir);
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 1.0);
-    scene.add(hemi);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
-    dir.position.set(2, 4, 2);
-    scene.add(dir);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 0.5;
+  controls.maxDistance = 8;
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.minDistance = 0.5;
-    controls.maxDistance = 8;
+  const loader = new THREE.GLTFLoader();
+  let mixer = null;
+  let modelRoot = null;
 
-    const loader = new THREE.GLTFLoader();
-    let mixer = null;
-    let modelRoot = null;
-
-    loader.load(modelUrl,
-      gltf => {
-        modelRoot = gltf.scene || gltf.scenes?.[0];
-        if (!modelRoot) {
-          console.error('GLTF loaded but contains no scene.');
-          return;
-        }
-
-        try {
-          const box = new THREE.Box3().setFromObject(modelRoot);
-          const size = box.getSize(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z);
-          if (maxDim > 0) {
-            const scale = 1.6 / maxDim;
-            modelRoot.scale.setScalar(scale);
-          }
-          const center = box.getCenter(new THREE.Vector3());
-          modelRoot.position.sub(center);
-        } catch (e) { /* ignore */ }
-
-        scene.add(modelRoot);
-
-        if (gltf.animations && gltf.animations.length > 0) {
-          mixer = new THREE.AnimationMixer(modelRoot);
-          gltf.animations.forEach((clip) => {
-            const action = mixer.clipAction(clip);
-            action.play();
-          });
-        }
-      },
-      xhr => {},
-      err => {
-        console.error('Failed to load model', err);
-        container.innerHTML = '<div style="color:#fff;padding:18px">Failed to load 3D model</div>';
+  loader.load(modelUrl,
+    gltf => {
+      modelRoot = gltf.scene || gltf.scenes?.[0];
+      if (!modelRoot) {
+        console.error('GLTF loaded but contains no scene.');
+        return;
       }
-    );
 
-    function onResize() {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      try {
+        const box = new THREE.Box3().setFromObject(modelRoot);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim > 0) {
+          const scale = 1.6 / maxDim;
+          modelRoot.scale.setScalar(scale);
+        }
+        const center = box.getCenter(new THREE.Vector3());
+        modelRoot.position.sub(center);
+      } catch (e) { /* ignore */ }
+
+      scene.add(modelRoot);
+
+      if (gltf.animations && gltf.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(modelRoot);
+        gltf.animations.forEach((clip) => {
+          const action = mixer.clipAction(clip);
+          action.play();
+        });
+      }
+    },
+    xhr => {},
+    err => {
+      console.error('Failed to load model', err);
+      container.innerHTML = '<div style="color:#fff;padding:18px">Failed to load 3D model</div>';
     }
-    window.addEventListener('resize', onResize);
+  );
 
-    const clock = new THREE.Clock();
-    let rafId = null;
-    function animate() {
-      rafId = requestAnimationFrame(animate);
-      const dt = clock.getDelta();
-      if (mixer) mixer.update(dt);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
+  function onResize() {
+    if (!container) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', onResize);
 
-    __threeInstance = {
-      cleanup: () => {
-        if (rafId) cancelAnimationFrame(rafId);
-        window.removeEventListener('resize', onResize);
-        try {
-          scene.traverse(obj => {
-            if (obj.geometry) obj.geometry.dispose?.();
-            if (obj.material) {
-              if (Array.isArray(obj.material)) {
-                obj.material.forEach(m => { if (m.map) m.map.dispose?.(); m.dispose?.(); });
-              } else {
-                if (obj.material.map) obj.material.map.dispose?.();
-                obj.material.dispose?.();
-              }
+  const clock = new THREE.Clock();
+  let rafId = null;
+  function animate() {
+    rafId = requestAnimationFrame(animate);
+    const dt = clock.getDelta();
+    if (mixer) mixer.update(dt);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  __threeInstance = {
+    cleanup: () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', onResize);
+      try {
+        scene.traverse(obj => {
+          if (obj.geometry) obj.geometry.dispose?.();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach(m => { if (m.map) m.map.dispose?.(); m.dispose?.(); });
+            } else {
+              if (obj.material.map) obj.material.map.dispose?.();
+              obj.material.dispose?.();
             }
-          });
-        } catch (e) { /* ignore */ }
-        try { renderer.dispose(); } catch (e) {}
-        if (container) container.innerHTML = '';
-      }
-    };
-  }, 200);
-}
-
-// ✅ FIX #1: ADD MISSING generateThumbnailBlob FUNCTION
-async function generateThumbnailBlob(videoFile, width, height, atTime) {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(videoFile);
-    video.onloadedmetadata = () => {
-      video.currentTime = Math.min(atTime, video.duration * 0.9);
-    };
-    video.onseeked = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, width, height);
-      canvas.toBlob(resolve, 'image/jpeg', 0.8);
-      URL.revokeObjectURL(video.src);
-    };
-    video.onerror = () => reject(new Error('Failed to load video'));
-  });
+          }
+        });
+      } catch (e) { /* ignore */ }
+      try { renderer.dispose(); } catch (e) {}
+      if (container) container.innerHTML = '';
+    }
+  };
 }
 
 async function uploadToR2(file) {
@@ -471,7 +442,6 @@ async function uploadToR2(file) {
   };
 }
 
-// ✅ FIX #2 & #3: OPTIMIZE UPLOADS WITH PARALLEL PROCESSING
 uploadSubmit.addEventListener('click', async () => {
   try {
     if (!currentUser) {
@@ -503,48 +473,33 @@ uploadSubmit.addEventListener('click', async () => {
     let thumbnailUrl = "";
     let thumbnailKey = "";
 
-    // ✅ PARALLEL UPLOADS - Upload video and model simultaneously
-    const uploadPromises = [];
-
     if (videoFile) {
-      uploadStatus.textContent = "Uploading video & model...";
-      uploadPromises.push(
-        (async () => {
-          const video = await uploadToR2(videoFile);
-          videoUrl = video.url;
-          videoKey = video.key;
+      uploadStatus.textContent = "Uploading video...";
+      const video = await uploadToR2(videoFile);
+      videoUrl = video.url;
+      videoKey = video.key;
 
-          try {
-            const blob = await generateThumbnailBlob(videoFile, 320, 180, 0.5);
-            if (blob) {
-              const thumbFile = new File(
-                [blob],
-                "thumb_" + Date.now() + ".jpg",
-                { type: "image/jpeg" }
-              );
-              const thumb = await uploadToR2(thumbFile);
-              thumbnailUrl = thumb.url;
-              thumbnailKey = thumb.key;
-            }
-          } catch (e) {
-            console.warn("Thumbnail generation failed:", e);
-          }
-        })()
-      );
+      try {
+        const blob = await generateThumbnailBlob(videoFile, 320, 180, 0.5);
+        if (blob) {
+          const thumbFile = new File(
+            [blob],
+            "thumb_" + Date.now() + ".jpg",
+            { type: "image/jpeg" }
+          );
+          const thumb = await uploadToR2(thumbFile);
+          thumbnailUrl = thumb.url;
+          thumbnailKey = thumb.key;
+        }
+      } catch {}
     }
 
     if (modelFile) {
-      uploadPromises.push(
-        (async () => {
-          const model = await uploadToR2(modelFile);
-          modelUrl = model.url;
-          modelKey = model.key;
-        })()
-      );
+      uploadStatus.textContent = "Uploading 3D model...";
+      const model = await uploadToR2(modelFile);
+      modelUrl = model.url;
+      modelKey = model.key;
     }
-
-    // Wait for all uploads to complete in parallel
-    await Promise.all(uploadPromises);
 
     await addDoc(collection(db, "videos"), {
       title,
