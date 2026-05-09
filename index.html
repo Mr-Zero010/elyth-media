@@ -394,6 +394,23 @@ modelRoot.traverse((child) => {
   }
 });
     console.log("Loaded model:", gltf);
+    console.log("Scene children:", modelRoot.children);
+
+modelRoot.traverse((child) => {
+
+  console.log(child);
+
+  if (child.isMesh) {
+
+    console.log("FOUND MESH:", child);
+
+    console.log("Geometry:", child.geometry);
+
+    console.log("Material:", child.material);
+
+  }
+
+});
 
     // Enable shadows + better materials
     modelRoot.traverse((obj) => {
@@ -1030,6 +1047,3 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-
-
-
