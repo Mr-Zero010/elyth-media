@@ -302,7 +302,7 @@ function load3DViewer(modelUrl) {
   const height = container.clientHeight || 420;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x222222);
+  scene.background = new THREE.Color(0xf1f5f9);
 
  const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -319,11 +319,18 @@ function load3DViewer(modelUrl) {
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
   camera.position.set(0, 1.2, 3);
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 1.0);
-  scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
-  dir.position.set(2, 4, 2);
-  scene.add(dir);
+  
+  // Better lighting
+const ambient = new THREE.AmbientLight(0xffffff, 2);
+scene.add(ambient);
+
+const dirLight1 = new THREE.DirectionalLight(0xffffff, 3);
+dirLight1.position.set(5, 5, 5);
+scene.add(dirLight1);
+
+const dirLight2 = new THREE.DirectionalLight(0xffffff, 2);
+dirLight2.position.set(-5, 3, -5);
+scene.add(dirLight2);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -357,6 +364,25 @@ loader.setDRACOLoader(dracoLoader);
     }
 
     scene.add(modelRoot);
+    // Force model visible
+modelRoot.traverse((child) => {
+
+  if (child.isMesh) {
+
+    child.visible = true;
+
+    if (child.material) {
+
+      child.material.side = THREE.DoubleSide;
+
+      child.material.transparent = false;
+
+      child.material.opacity = 1;
+
+      child.material.needsUpdate = true;
+    }
+  }
+});
     console.log("Loaded model:", gltf);
 
     // Enable shadows + better materials
@@ -390,7 +416,8 @@ loader.setDRACOLoader(dracoLoader);
 
       const distance = 1.3 * Math.max(fitHeightDistance, fitWidthDistance);
 
-      camera.position.set(0, maxDim * 0.2, distance);
+      camera.position.set(0, maxDim * 0.5, distance * 1.4);
+      camera.lookAt(0, 0, 0);
 
       camera.near = distance / 100;
       camera.far = distance * 100;
@@ -979,4 +1006,5 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
 
