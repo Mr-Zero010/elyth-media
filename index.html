@@ -371,19 +371,41 @@ const grid = new THREE.GridHelper(10, 10);
 scene.add(grid);
     modelRoot.rotation.y = Math.PI / 4;
     console.log("MODEL ADDED TO SCENE");
-    // Force model visible
+ // Make model visible + KEEP ORIGINAL MATERIALS
 modelRoot.traverse((child) => {
 
   if (child.isMesh) {
 
     child.visible = true;
 
-    // FORCE SAFE MATERIAL
-    child.material = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      metalness: 0.2,
-      roughness: 0.7
-    });
+    // KEEP ORIGINAL MATERIAL
+    if (child.material) {
+
+      if (Array.isArray(child.material)) {
+
+        child.material.forEach((mat) => {
+
+          mat.needsUpdate = true;
+
+          // brighter rendering
+          if ("metalness" in mat) mat.metalness *= 0.7;
+          if ("roughness" in mat) mat.roughness *= 1.1;
+
+        });
+
+      } else {
+
+        child.material.needsUpdate = true;
+
+        if ("metalness" in child.material) {
+          child.material.metalness *= 0.7;
+        }
+
+        if ("roughness" in child.material) {
+          child.material.roughness *= 1.1;
+        }
+      }
+    }
 
     child.castShadow = true;
     child.receiveShadow = true;
@@ -546,7 +568,7 @@ controls.update();
   const dt = clock.getDelta();
 
   if (mixer) mixer.update(dt);
-  
+
   controls.update();
 
   renderer.render(scene, camera);
