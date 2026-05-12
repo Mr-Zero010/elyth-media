@@ -332,13 +332,6 @@ const dirLight2 = new THREE.DirectionalLight(0xffffff, 2);
 dirLight2.position.set(-5, 3, -5);
 scene.add(dirLight2);
 
-//test cube
-const testGeo = new THREE.BoxGeometry();
-const testMat = new THREE.MeshNormalMaterial();
-const testCube = new THREE.Mesh(testGeo, testMat);
-
-scene.add(testCube);
-
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -553,12 +546,7 @@ controls.update();
   const dt = clock.getDelta();
 
   if (mixer) mixer.update(dt);
-
-  // TEST ROTATION
-  if (modelRoot) {
-    modelRoot.rotation.y += 0.01;
-  }
-
+  
   controls.update();
 
   renderer.render(scene, camera);
