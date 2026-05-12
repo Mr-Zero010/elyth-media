@@ -385,20 +385,15 @@ modelRoot.traverse((child) => {
 
     child.visible = true;
 
-    if (child.material) {
+    // FORCE SAFE MATERIAL
+    child.material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.2,
+      roughness: 0.7
+    });
 
-      child.material.side = THREE.DoubleSide;
-
-      child.material.transparent = false;
-
-      child.material.opacity = 1;
-
-      child.material.needsUpdate = true;
-      
-      child.material.depthWrite = true;
-      
-      child.material.depthTest = true;
-    }
+    child.castShadow = true;
+    child.receiveShadow = true;
   }
 });
     console.log("Loaded model:", gltf);
