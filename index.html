@@ -332,16 +332,6 @@ const dirLight2 = new THREE.DirectionalLight(0xffffff, 2);
 dirLight2.position.set(-5, 3, -5);
 scene.add(dirLight2);
 
-// DEBUG CUBE
-const testCube = new THREE.Mesh(
-  new THREE.BoxGeometry(),
-  new THREE.MeshNormalMaterial()
-);
-
-testCube.position.set(0, 0, 0);
-
-scene.add(testCube);
-
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
