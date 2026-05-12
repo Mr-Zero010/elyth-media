@@ -371,77 +371,40 @@ const grid = new THREE.GridHelper(10, 10);
 scene.add(grid);
     modelRoot.rotation.y = Math.PI / 4;
     console.log("MODEL ADDED TO SCENE");
- // Make model visible + KEEP ORIGINAL MATERIALS
+ // Make model visible + safe material setup
 modelRoot.traverse((child) => {
 
   if (child.isMesh) {
 
     child.visible = true;
 
-    // KEEP ORIGINAL MATERIAL
-    if (child.material) {
-
-      if (Array.isArray(child.material)) {
-
-        child.material.forEach((mat) => {
-
-          mat.needsUpdate = true;
-
-          // brighter rendering
-          if ("metalness" in mat) mat.metalness *= 0.7;
-          if ("roughness" in mat) mat.roughness *= 1.1;
-
-        });
-
-      } else {
-
-        child.material.needsUpdate = true;
-
-        if ("metalness" in child.material) {
-          child.material.metalness *= 0.7;
-        }
-
-        if ("roughness" in child.material) {
-          child.material.roughness *= 1.1;
-        }
-      }
-    }
-
     child.castShadow = true;
     child.receiveShadow = true;
-  }
-});
-    console.log("Loaded model:", gltf);
-    console.log("Scene children:", modelRoot.children);
 
-modelRoot.traverse((child) => {
+    if (child.material) {
 
-  console.log(child);
+      const materials = Array.isArray(child.material)
+        ? child.material
+        : [child.material];
 
-  if (child.isMesh) {
+      materials.forEach((mat) => {
 
-    console.log("FOUND MESH:", child);
+        if (!mat || typeof mat !== "object") return;
 
-    console.log("Geometry:", child.geometry);
-
-    console.log("Material:", child.material);
-
-  }
-
-});
-
-    // Enable shadows + better materials
-    modelRoot.traverse((obj) => {
-      if (obj.isMesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
-
-        if (obj.material) {
-          obj.material.needsUpdate = true;
+        // Safe tweaks only
+        if ("metalness" in mat) {
+          mat.metalness *= 0.7;
         }
-      }
-    });
 
+        if ("roughness" in mat) {
+          mat.roughness *= 1.1;
+        }
+
+        mat.needsUpdate = true;
+      });
+    }
+  }
+});
    // AUTO CENTER MODEL
 const box = new THREE.Box3().setFromObject(modelRoot);
 
