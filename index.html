@@ -332,6 +332,13 @@ const dirLight2 = new THREE.DirectionalLight(0xffffff, 2);
 dirLight2.position.set(-5, 3, -5);
 scene.add(dirLight2);
 
+//test cube
+const testGeo = new THREE.BoxGeometry();
+const testMat = new THREE.MeshNormalMaterial();
+const testCube = new THREE.Mesh(testGeo, testMat);
+
+scene.add(testCube);
+
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -364,6 +371,11 @@ loader.setDRACOLoader(dracoLoader);
     }
 
     scene.add(modelRoot);
+    const axes = new THREE.AxesHelper(5);
+scene.add(axes);
+
+const grid = new THREE.GridHelper(10, 10);
+scene.add(grid);
     modelRoot.rotation.y = Math.PI / 4;
     console.log("MODEL ADDED TO SCENE");
     // Force model visible
@@ -382,6 +394,10 @@ modelRoot.traverse((child) => {
       child.material.opacity = 1;
 
       child.material.needsUpdate = true;
+      
+      child.material.depthWrite = true;
+      
+      child.material.depthTest = true;
     }
   }
 });
@@ -431,7 +447,7 @@ const maxAxis = Math.max(size.x, size.y, size.z);
 
 if (maxAxis > 0) {
 
-  const scale = 10 / maxAxis;
+  const scale = 2 / maxAxis;
 
   modelRoot.scale.setScalar(scale);
 
