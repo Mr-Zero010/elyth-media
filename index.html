@@ -435,22 +435,36 @@ modelRoot.traverse((child) => {
    // AUTO CENTER MODEL
 const box = new THREE.Box3().setFromObject(modelRoot);
 
-const center = box.getCenter(new THREE.Vector3());
-const size = box.getSize(new THREE.Vector3());
+if (!box.isEmpty()) {
 
-modelRoot.position.x -= center.x;
-modelRoot.position.y -= center.y;
-modelRoot.position.z -= center.z;
+  const center = new THREE.Vector3();
+  box.getCenter(center);
 
-// FORCE SAFE SCALE
-const maxAxis = Math.max(size.x, size.y, size.z);
+  const size = new THREE.Vector3();
+  box.getSize(size);
 
-if (maxAxis > 0) {
+  console.log("MODEL SIZE:", size);
 
-  const scale = 2 / maxAxis;
+  // Prevent insane broken models
+  const maxAxis = Math.max(size.x, size.y, size.z);
 
-  modelRoot.scale.setScalar(scale);
+  if (maxAxis > 0 && maxAxis < 10000) {
 
+    // Center model
+    modelRoot.position.sub(center);
+
+    // Safe scaling
+    const scale = 2 / maxAxis;
+    modelRoot.scale.setScalar(scale);
+
+  } else {
+
+    console.warn("BROKEN MODEL BOUNDS");
+
+    modelRoot.scale.setScalar(1);
+
+    modelRoot.position.set(0, 0, 0);
+  }
 }
 
 // RECALCULATE AFTER SCALE
