@@ -370,7 +370,7 @@ loader.setDRACOLoader(dracoLoader);
       throw new Error("No scene in model");
     }
 
-    scene.add(modelRoot);
+    
     const axes = new THREE.AxesHelper(5);
 scene.add(axes);
 
@@ -435,38 +435,40 @@ modelRoot.traverse((child) => {
    // AUTO CENTER MODEL
 const box = new THREE.Box3().setFromObject(modelRoot);
 
-if (!box.isEmpty()) {
+const center = new THREE.Vector3();
+box.getCenter(center);
 
-  const center = new THREE.Vector3();
-  box.getCenter(center);
+const size = new THREE.Vector3();
+box.getSize(size);
 
-  const size = new THREE.Vector3();
-  box.getSize(size);
+const maxAxis = Math.max(size.x, size.y, size.z);
 
-  console.log("MODEL SIZE:", size);
+console.log("MODEL SIZE:", size);
+console.log("MAX AXIS:", maxAxis);
 
-  // Prevent insane broken models
-  const maxAxis = Math.max(size.x, size.y, size.z);
+// move model to center
+modelRoot.position.set(
+  -center.x,
+  -center.y,
+  -center.z
+);
 
-  if (maxAxis > 0 && maxAxis < 10000) {
+// safer scale
+if (maxAxis > 0) {
 
-    // Center model
-    modelRoot.position.sub(center);
+  const scale = 2 / maxAxis;
 
-    // Safe scaling
-    const scale = 1 / maxAxis;
-    modelRoot.scale.setScalar(scale);
+  modelRoot.scale.setScalar(scale);
 
-  } else {
+} else {
 
-    console.warn("BROKEN MODEL BOUNDS");
+  modelRoot.scale.setScalar(1);
 
-    modelRoot.scale.setScalar(1);
-
-    modelRoot.position.set(0, 0, 0);
-  }
 }
+scene.add(modelRoot);
 
+console.log("FINAL POSITION:", modelRoot.position);
+console.log("FINAL SCALE:", modelRoot.scale);
 // RECALCULATE AFTER SCALE
 const scaledBox = new THREE.Box3().setFromObject(modelRoot);
 
