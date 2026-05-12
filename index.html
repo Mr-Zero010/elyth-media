@@ -302,7 +302,7 @@ function load3DViewer(modelUrl) {
   const height = container.clientHeight || 420;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf1f5f9);
+  scene.background = new THREE.Color(0x111111);
 
  const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -364,6 +364,8 @@ loader.setDRACOLoader(dracoLoader);
     }
 
     scene.add(modelRoot);
+    modelRoot.rotation.y = Math.PI / 4;
+    console.log("MODEL ADDED TO SCENE");
     // Force model visible
 modelRoot.traverse((child) => {
 
@@ -429,7 +431,7 @@ const maxAxis = Math.max(size.x, size.y, size.z);
 
 if (maxAxis > 0) {
 
-  const scale = 2 / maxAxis;
+  const scale = 10 / maxAxis;
 
   modelRoot.scale.setScalar(scale);
 
@@ -447,7 +449,7 @@ const finalMaxDim = Math.max(
 );
 
 // CAMERA
-camera.position.set(0, 0.5, 3);
+camera.position.set(0, 2, 8);
 
 camera.near = 0.01;
 camera.far = 1000;
