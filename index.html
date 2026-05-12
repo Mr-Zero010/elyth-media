@@ -446,14 +446,7 @@ const maxAxis = Math.max(size.x, size.y, size.z);
 console.log("MODEL SIZE:", size);
 console.log("MAX AXIS:", maxAxis);
 
-// move model to center
-modelRoot.position.set(
-  -center.x,
-  -center.y,
-  -center.z
-);
-
-// safer scale
+// SCALE FIRST
 if (maxAxis > 0) {
 
   const scale = 2 / maxAxis;
@@ -465,8 +458,24 @@ if (maxAxis > 0) {
   modelRoot.scale.setScalar(1);
 
 }
-scene.add(modelRoot);
 
+// RECALCULATE BOX AFTER SCALE
+const newBox = new THREE.Box3().setFromObject(modelRoot);
+
+const newCenter = new THREE.Vector3();
+newBox.getCenter(newCenter);
+
+// CENTER MODEL
+modelRoot.position.set(
+  -newCenter.x,
+  -newCenter.y,
+  -newCenter.z
+);
+
+scene.add(modelRoot);
+console.log("SCENE:", scene);
+console.log("MODEL:", modelRoot);
+console.log("MODEL CHILDREN:", modelRoot.children.length);
 console.log("FINAL POSITION:", modelRoot.position);
 console.log("FINAL SCALE:", modelRoot.scale);
 // RECALCULATE AFTER SCALE
@@ -542,13 +551,23 @@ controls.update();
 
   const clock = new THREE.Clock();
   let rafId = null;
-  function animate() {
-    rafId = requestAnimationFrame(animate);
-    const dt = clock.getDelta();
-    if (mixer) mixer.update(dt);
-    controls.update();
-    renderer.render(scene, camera);
+ function animate() {
+
+  rafId = requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+
+  if (mixer) mixer.update(dt);
+
+  // TEST ROTATION
+  if (modelRoot) {
+    modelRoot.rotation.y += 0.01;
   }
+
+  controls.update();
+
+  renderer.render(scene, camera);
+}
   animate();
 
  __threeInstance = {
