@@ -374,45 +374,62 @@ scene.add(grid);
  // Make model visible + safe material setup
 modelRoot.traverse((child) => {
 
-  if (child.isMesh) {
+  if (!child.isMesh) return;
 
-    child.visible = true;
+  child.visible = true;
+  child.castShadow = true;
+  child.receiveShadow = true;
 
-    child.castShadow = true;
-    child.receiveShadow = true;
+  let materials = Array.isArray(child.material)
+    ? child.material
+    : [child.material];
 
-    if (child.material) {
+  materials = materials.map((mat) => {
 
-      const materials = Array.isArray(child.material)
-        ? child.material
-        : [child.material];
+    // BAD / broken material
+    if (
+      !mat ||
+      typeof mat !== "object" ||
+      typeof mat.onBeforeCompile !== "function"
+    ) {
 
-      materials.forEach((mat) => {
-
-        if (!mat) return;
-
-        // Only modify supported material types
-        if (
-          !(mat instanceof THREE.MeshStandardMaterial) &&
-          !(mat instanceof THREE.MeshPhysicalMaterial) &&
-          !(mat instanceof THREE.MeshPhongMaterial)
-        ) {
-          return;
-        }
-
-        if (typeof mat.metalness === "number") {
-          mat.metalness *= 0.7;
-        }
-
-        if (typeof mat.roughness === "number") {
-          mat.roughness *= 1.1;
-        }
-
-        mat.needsUpdate = true;
-
+      return new THREE.MeshStandardMaterial({
+        color: 0xcccccc
       });
     }
-  }
+
+    // Convert unsupported material types
+    if (
+      !(mat instanceof THREE.MeshStandardMaterial) &&
+      !(mat instanceof THREE.MeshPhysicalMaterial) &&
+      !(mat instanceof THREE.MeshPhongMaterial) &&
+      !(mat instanceof THREE.MeshBasicMaterial)
+    ) {
+
+      return new THREE.MeshStandardMaterial({
+        map: mat.map || null,
+        color: mat.color || new THREE.Color(0xffffff)
+      });
+    }
+
+    // Safe tweaks
+    if ("metalness" in mat) {
+      mat.metalness *= 0.7;
+    }
+
+    if ("roughness" in mat) {
+      mat.roughness *= 1.1;
+    }
+
+    mat.needsUpdate = true;
+
+    return mat;
+  });
+
+  child.material = Array.isArray(child.material)
+    ? materials
+    : materials[0];
+
 });
   
 
@@ -481,7 +498,6 @@ camera.far = 1000;
 
 camera.lookAt(0, 0, 0);
 controls.update();
-renderer.render(scene, camera);
 
 camera.updateProjectionMatrix();
 
