@@ -737,6 +737,25 @@ xhr.upload.onprogress = (event) => {
     xhr.onerror = () => {
       reject(new Error("Network error"));
     };
+  
+xhr.timeout = 1000 * 60 * 10;
+
+xhr.ontimeout = () => {
+
+  reject(new Error("Upload timeout"));
+
+};
+
+xhr.onreadystatechange = () => {
+
+  console.log(
+    "XHR STATE:",
+    xhr.readyState,
+    "STATUS:",
+    xhr.status
+  );
+
+};
 
     xhr.send(file);
 
