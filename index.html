@@ -685,20 +685,31 @@ async function uploadToR2(file, progressCallback = null) {
     );
 xhr.upload.onprogress = (event) => {
 
-  console.log(
-    "UPLOADED:",
-    event.loaded,
-    "/",
-    event.total
+  if (!progressCallback) return;
+
+  const total =
+    event.total ||
+    file.size ||
+    1;
+
+  let percent = Math.round(
+    (event.loaded / total) * 100
   );
 
-  if (event.lengthComputable && progressCallback) {
-
-    const percent =
-      Math.round((event.loaded / event.total) * 100);
-
-    progressCallback(percent);
+  // Prevent fake 100% before server response
+  if (percent > 98) {
+    percent = 98;
   }
+
+  progressCallback(percent);
+
+  console.log(
+    "Uploaded",
+    event.loaded,
+    "/",
+    total,
+    percent + "%"
+  );
 };
 
     xhr.onload = () => {
