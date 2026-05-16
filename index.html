@@ -641,6 +641,10 @@ controls.update();
 }
 
 async function uploadToR2(file, progressCallback = null) {
+  console.log(
+  "FILE SIZE MB:",
+  (file.size / 1024 / 1024).toFixed(2)
+);
 
   const user = auth.currentUser;
 
@@ -679,17 +683,23 @@ async function uploadToR2(file, progressCallback = null) {
       "Content-Type",
       file.type || "application/octet-stream"
     );
+xhr.upload.onprogress = (event) => {
 
-    xhr.upload.onprogress = (event) => {
+  console.log(
+    "UPLOADED:",
+    event.loaded,
+    "/",
+    event.total
+  );
 
-      if (event.lengthComputable && progressCallback) {
+  if (event.lengthComputable && progressCallback) {
 
-        const percent =
-          Math.round((event.loaded / event.total) * 100);
+    const percent =
+      Math.round((event.loaded / event.total) * 100);
 
-        progressCallback(percent);
-      }
-    };
+    progressCallback(percent);
+  }
+};
 
     xhr.onload = () => {
 
