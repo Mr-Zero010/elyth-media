@@ -865,25 +865,31 @@ uploadSubmit.addEventListener('click', async () => {
 
   uploadStatus.textContent = "Uploading video...";
 
-  // Start thumbnail generation
-  const thumbnailPromise = generateThumbnailBlob(
-    videoFile,
-    320,
-    180,
-    0.5
-  ).catch(() => null);
+  uploadStatus.textContent = "Starting upload...";
 
-  // Start video upload immediately
-  const videoUploadPromise = uploadToR2(videoFile);
+const videoUploadPromise = uploadToR2(
+  videoFile,
+  (percent) => {
+    uploadStatus.textContent =
+      "Uploading video... " + percent + "%";
+  }
+);
 
-  // Wait for thumbnail
-  let blob = null;
+// Generate thumbnail in background
+let blob = null;
 
-try {
-  blob = await thumbnailPromise;
-} catch (e) {
+generateThumbnailBlob(
+  videoFile,
+  320,
+  180,
+  0.5
+)
+.then((result) => {
+  blob = result;
+})
+.catch((e) => {
   console.warn("Thumbnail generation failed", e);
-}
+});
 
   // Upload thumbnail ASAP
   if (blob) {
