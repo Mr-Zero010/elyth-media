@@ -871,37 +871,33 @@ uploadSubmit.addEventListener('click', async () => {
     let thumbnailUrl = "";
     let thumbnailKey = "";
 
- if (videoFile) {
+  
 
-  uploadStatus.textContent = "Uploading video...";
+  uploadStatus.textContent = "Preparing upload...";
 
-  uploadStatus.textContent = "Starting upload...";
+  // Start thumbnail generation
+  const thumbnailPromise = generateThumbnailBlob(
+    videoFile,
+    320,
+    180,
+    0.5
+  ).catch(() => null);if (videoFile) {
 
-const videoUploadPromise = uploadToR2(
-  videoFile,
-  (percent) => {
-    uploadStatus.textContent =
-      "Uploading video... " + percent + "%";
-  }
-);
+  // Start video upload immediately
+  const videoUploadPromise = uploadToR2(
+    videoFile,
+    (percent) => {
 
-// Generate thumbnail in background
-let blob = null;
+      uploadStatus.textContent =
+        "Uploading video... " + percent + "%";
 
-generateThumbnailBlob(
-  videoFile,
-  320,
-  180,
-  0.5
-)
-.then((result) => {
-  blob = result;
-})
-.catch((e) => {
-  console.warn("Thumbnail generation failed", e);
-});
+    }
+  );
 
-  // Upload thumbnail ASAP
+  // Wait for thumbnail
+  const blob = await thumbnailPromise;
+
+  // Upload thumbnail
   if (blob) {
 
     try {
@@ -919,17 +915,24 @@ generateThumbnailBlob(
 
     } catch (err) {
 
-      console.warn("Thumbnail upload failed", err);
+      console.warn(
+        "Thumbnail upload failed",
+        err
+      );
 
     }
   }
 
-  // Wait for video upload LAST
+  // Wait for video upload
   const video = await videoUploadPromise;
 
   videoUrl = video.url;
   videoKey = video.key;
   videoType = videoFile.type || "video/mp4";
+
+  uploadStatus.textContent =
+    "Video upload complete";
+
 }
 
     if (modelFile) {
