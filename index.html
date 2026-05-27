@@ -747,8 +747,8 @@ async function uploadToR2(file, progressCallback = null) {
 
   let uploadedBytes = 0;
 
-  const uploadIdRes = await fetch(
-    R2_UPLOAD_ENDPOINT + "?action=start",
+ const uploadIdRes = await fetch(
+  R2_UPLOAD_ENDPOINT + "?action=start",
     {
       method: "POST",
       headers: {
@@ -756,7 +756,10 @@ async function uploadToR2(file, progressCallback = null) {
         "x-filename": safeName,
         "Content-Type":
           "application/json"
-      }
+      },
+      body: JSON.stringify({
+  fileName: safeName
+})
     }
   );
 
@@ -785,23 +788,30 @@ async function uploadToR2(file, progressCallback = null) {
 
     const chunk = file.slice(start, end);
 
-    const partRes = await fetch(
-      R2_UPLOAD_ENDPOINT +
-      "?action=uploadPart" +
-      "&uploadId=" + encodeURIComponent(uploadId) +
-      "&key=" + encodeURIComponent(key) +
-      "&partNumber=" + partNumber,
-      {
-        method: "POST",
-        headers: {
-          "Authorization":
-            "Bearer " + token,
-          "Content-Type":
-            "application/octet-stream"
-        },
-        body: chunk
-      }
-    );
+   const partRes = await fetch(
+  R2_UPLOAD_ENDPOINT + "/upload-part",
+  {
+    method: "PUT",
+    headers: {
+      "Authorization":
+        "Bearer " + token,
+
+      "Content-Type":
+        "application/octet-stream",
+
+      "x-upload-id":
+        uploadId,
+
+      "x-key":
+        key,
+
+      "x-part-number":
+        String(partNumber)
+    },
+
+    body: chunk
+  }
+);
 
     if (!partRes.ok) {
       throw new Error(
@@ -831,9 +841,8 @@ async function uploadToR2(file, progressCallback = null) {
       progressCallback(percent);
     }
   }
-
-  const completeRes = await fetch(
-    R2_UPLOAD_ENDPOINT + "?action=complete",
+const completeRes = await fetch(
+  R2_UPLOAD_ENDPOINT + "/complete-upload",
     {
       method: "POST",
       headers: {
