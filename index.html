@@ -739,7 +739,8 @@ async function uploadToR2(file, progressCallback = null) {
 
   /* ================= LARGE FILES ================= */
 
-  const CHUNK_SIZE = 10 * 1024 * 1024;
+  const CHUNK_SIZE =
+  10 * 1024 * 1024;
 
   const totalChunks = Math.ceil(
     file.size / CHUNK_SIZE
@@ -748,7 +749,7 @@ async function uploadToR2(file, progressCallback = null) {
   let uploadedBytes = 0;
 
  const uploadIdRes = await fetch(
-  R2_UPLOAD_ENDPOINT + "?action=start",
+  R2_UPLOAD_ENDPOINT + "/create-upload",
     {
       method: "POST",
       headers: {
@@ -831,28 +832,13 @@ uploadedBytes += chunk.size;
 const percent = Math.round(
   (uploadedBytes / file.size) * 100
 );
+  }
 
 if (progressCallback) {
   progressCallback(
     percent > 98 ? 98 : percent
   );
-}
-
-    uploadedBytes += chunk.size;
-
-    if (progressCallback) {
-
-      let percent = Math.round(
-        (uploadedBytes / file.size) * 100
-      );
-
-      if (percent > 98) {
-        percent = 98;
-      }
-
-      progressCallback(percent);
-    }
-  }
+ }
 const completeRes = await fetch(
   R2_UPLOAD_ENDPOINT + "/complete-upload",
     {
