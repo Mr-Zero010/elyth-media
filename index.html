@@ -821,10 +821,22 @@ async function uploadToR2(file, progressCallback = null) {
 
     const partData = await partRes.json();
 
-    parts.push({
-      partNumber,
-      etag: partData.etag
-    });
+parts.push({
+  partNumber,
+  etag: partData.etag
+});
+
+uploadedBytes += chunk.size;
+
+const percent = Math.round(
+  (uploadedBytes / file.size) * 100
+);
+
+if (progressCallback) {
+  progressCallback(
+    percent > 98 ? 98 : percent
+  );
+}
 
     uploadedBytes += chunk.size;
 
