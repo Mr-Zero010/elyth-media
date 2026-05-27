@@ -624,128 +624,37 @@ controls.update();
 }
 
 async function uploadToR2(file) {
-
   const user = auth.currentUser;
-
   if (!user) {
     throw new Error("Not authenticated");
   }
 
   const token = await user.getIdToken(true);
-
-  const safeName =
-    Date.now() + "_" +
-    (file.name || "file")
-      .replace(/[^a-zA-Z0-9._-]/g, "");
-
-  // CREATE MULTIPART SESSION
-
-  const createRes = await fetch(
-    R2_UPLOAD_ENDPOINT + "/create-upload",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + token,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        fileName: safeName
-      })
-    }
-  );
-
-  const createData = await createRes.json();
-
-  if (!createData.success) {
-    throw new Error(createData.error);
+  if (!token) {
+    throw new Error("Failed to get Firebase token");
   }
 
-  const uploadId = createData.uploadId;
-  const key = createData.key;
+  const safeName = Date.now() + "_" + (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "");
 
-  const CHUNK_SIZE = 10 * 1024 * 1024;
+  const res = await fetch(R2_UPLOAD_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "x-filename": safeName,
+      "Content-Type": file.type || "application/octet-stream"
+    },
+    body: file
+  });
 
-  const parts = [];
-
-  let partNumber = 1;
-
-  for (
-    let start = 0;
-    start < file.size;
-    start += CHUNK_SIZE
-  ) {
-
-    const end = Math.min(
-      start + CHUNK_SIZE,
-      file.size
-    );
-
-    const chunk = file.slice(start, end);
-
-    uploadStatus.textContent =
-      `Uploading ${Math.floor(
-        (end / file.size) * 100
-      )}%`;
-
-    const uploadRes = await fetch(
-      R2_UPLOAD_ENDPOINT + "/upload-part",
-      {
-        method: "PUT",
-        headers: {
-          "Authorization": "Bearer " + token,
-          "x-upload-id": uploadId,
-          "x-key": key,
-          "x-part-number": partNumber
-        },
-        body: chunk
-      }
-    );
-
-    const uploadData =
-      await uploadRes.json();
-
-    if (!uploadData.success) {
-      throw new Error(uploadData.error);
-    }
-
-    parts.push({
-      partNumber,
-      etag: uploadData.etag
-    });
-
-    partNumber++;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("Worker upload failed: " + res.status + " " + text);
   }
 
-  // COMPLETE UPLOAD
-
-  const completeRes = await fetch(
-    R2_UPLOAD_ENDPOINT + "/complete-upload",
-    {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + token,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        uploadId,
-        key,
-        parts
-      })
-    }
-  );
-
-  const completeData =
-    await completeRes.json();
-
-  if (!completeData.success) {
-    throw new Error(completeData.error);
-  }
-
+  const data = await res.json();
   return {
-    url:
-      completeData.url ||
-      (R2_UPLOAD_ENDPOINT + "/" + key),
-    key
+    url: data.url,
+    key: data.key
   };
 }
 function generateThumbnailBlob(file, width = 320, height = 180, seekTo = 0.5) {
@@ -1211,3 +1120,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
