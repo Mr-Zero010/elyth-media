@@ -642,11 +642,6 @@ controls.update();
 
 async function uploadToR2(file, progressCallback = null) {
 
-  console.log(
-    "FILE SIZE MB:",
-    (file.size / 1024 / 1024).toFixed(2)
-  );
-
   const user = auth.currentUser;
 
   if (!user) {
@@ -661,126 +656,48 @@ async function uploadToR2(file, progressCallback = null) {
     (file.name || "file")
       .replace(/[^a-zA-Z0-9._-]/g, "");
 
-  /* ================= SMALL FILES ================= */
-
-  if (file.size < 50 * 1024 * 1024) {
-
-    return new Promise((resolve, reject) => {
-
-      const xhr = new XMLHttpRequest();
-
-      xhr.open("POST", R2_UPLOAD_ENDPOINT);
-
-      xhr.setRequestHeader(
-        "Authorization",
-        "Bearer " + token
-      );
-
-      xhr.setRequestHeader(
-        "x-filename",
-        safeName
-      );
-
-      xhr.setRequestHeader(
-        "Content-Type",
-        file.type || "application/octet-stream"
-      );
-
-      xhr.upload.onprogress = (event) => {
-
-        if (!progressCallback) return;
-
-        if (event.lengthComputable) {
-
-          let percent = Math.round(
-            (event.loaded / event.total) * 100
-          );
-
-          if (percent > 98) {
-            percent = 98;
-          }
-
-          progressCallback(percent);
-        }
-      };
-
-      xhr.onload = () => {
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-
-          const data = JSON.parse(xhr.responseText);
-
-          progressCallback?.(100);
-
-          resolve({
-            url: data.url,
-            key: data.key
-          });
-
-        } else {
-
-          reject(
-            new Error(
-              "Upload failed: " +
-              xhr.responseText
-            )
-          );
-        }
-      };
-
-      xhr.onerror = () => {
-        reject(new Error("Network error"));
-      };
-
-      xhr.send(file);
-
-    });
-  }
-
-  /* ================= LARGE FILES ================= */
-
-  const CHUNK_SIZE =
-  10 * 1024 * 1024;
-
-  const totalChunks = Math.ceil(
-    file.size / CHUNK_SIZE
-  );
-
-  let uploadedBytes = 0;
-
- const uploadIdRes = await fetch(
+  // START MULTIPART
+  const startRes = await fetch(
   R2_UPLOAD_ENDPOINT + "/create-upload",
-    {
-      method: "POST",
+  {
+     method: "POST",
+
       headers: {
         "Authorization": "Bearer " + token,
-        "x-filename": safeName,
-        "Content-Type":
-          "application/json"
+        "Content-Type": "application/json"
       },
+
       body: JSON.stringify({
-  fileName: safeName
-})
+        fileName: safeName,
+        contentType:
+          file.type || "application/octet-stream"
+      })
     }
   );
 
-  if (!uploadIdRes.ok) {
+  if (!startRes.ok) {
     throw new Error(
       "Failed to start multipart upload"
     );
   }
 
-  const uploadData = await uploadIdRes.json();
+  const startData = await startRes.json();
 
-  const uploadId = uploadData.uploadId;
-  const key = uploadData.key;
+  const uploadId = startData.uploadId;
+  const key = startData.key;
+
+  const CHUNK_SIZE =
+    10 * 1024 * 1024;
 
   const parts = [];
 
-  for (let partNumber = 1; partNumber <= totalChunks; partNumber++) {
+  let partNumber = 1;
 
-    const start =
-      (partNumber - 1) * CHUNK_SIZE;
+  for (
+    let start = 0;
+    start < file.size;
+    start += CHUNK_SIZE
+  ) {
 
     const end = Math.min(
       start + CHUNK_SIZE,
@@ -789,66 +706,80 @@ async function uploadToR2(file, progressCallback = null) {
 
     const chunk = file.slice(start, end);
 
-   const partRes = await fetch(
-  R2_UPLOAD_ENDPOINT + "/upload-part",
-  {
-    method: "PUT",
-    headers: {
-      "Authorization":
-        "Bearer " + token,
+    const uploadRes = await fetch(
+  R2_UPLOAD_ENDPOINT +
+    "/upload-part",
+      {
+        method: "PUT",
 
-      "Content-Type":
-        "application/octet-stream",
+        headers: {
+          "Authorization":
+            "Bearer " + token,
 
-      "x-upload-id":
-        uploadId,
+          "x-upload-id":
+            uploadId,
 
-      "x-key":
-        key,
+          "x-part-number":
+            String(partNumber),
 
-      "x-part-number":
-        String(partNumber)
-    },
+          "x-key":
+          key,
 
-    body: chunk
-  }
-);
+          "Content-Type":
+            "application/octet-stream"
+        },
 
-    if (!partRes.ok) {
+        body: chunk
+      }
+    );
+
+    if (!uploadRes.ok) {
+
       throw new Error(
-        "Chunk upload failed"
+        "Chunk upload failed at part " +
+        partNumber
       );
+
     }
 
-    const partData = await partRes.json();
+    const uploadData =
+      await uploadRes.json();
 
-parts.push({
-  partNumber,
-  etag: partData.etag
-});
+    parts.push({
+      partNumber,
+      etag: uploadData.etag
+    });
 
-uploadedBytes += chunk.size;
+    let percent = Math.round(
+      (end / file.size) * 100
+    );
 
-const percent = Math.round(
-  (uploadedBytes / file.size) * 100
-);
+    if (percent > 98) {
+      percent = 98;
+    }
+
+    if (progressCallback) {
+      progressCallback(percent);
+    }
+
+    partNumber++;
   }
 
-if (progressCallback) {
-  progressCallback(
-    percent > 98 ? 98 : percent
-  );
- }
-const completeRes = await fetch(
-  R2_UPLOAD_ENDPOINT + "/complete-upload",
+  // COMPLETE MULTIPART
+  const completeRes = await fetch(
+  R2_UPLOAD_ENDPOINT +
+    "/complete-upload",
     {
       method: "POST",
+
       headers: {
         "Authorization":
           "Bearer " + token,
+
         "Content-Type":
           "application/json"
       },
+
       body: JSON.stringify({
         uploadId,
         key,
@@ -858,19 +789,23 @@ const completeRes = await fetch(
   );
 
   if (!completeRes.ok) {
+
     throw new Error(
       "Failed to complete upload"
     );
+
   }
 
-  const finalData =
+  const completeData =
     await completeRes.json();
 
-  progressCallback?.(100);
+  if (progressCallback) {
+    progressCallback(100);
+  }
 
   return {
-    url: finalData.url,
-    key: finalData.key
+    url: completeData.url,
+    key: completeData.key
   };
 }
 function generateThumbnailBlob(file, width = 320, height = 180, seekTo = 0.5) {
@@ -1007,12 +942,14 @@ uploadSubmit.addEventListener('click', async () => {
   uploadStatus.textContent = "Preparing upload...";
 
   // Start thumbnail generation
-  const thumbnailPromise = generateThumbnailBlob(
-    videoFile,
-    320,
-    180,
-    0.5
-  ).catch(() => null);if (videoFile) {
+  const thumbnailPromise = videoFile
+  ? generateThumbnailBlob(
+      videoFile,
+      320,
+      180,
+      0.5
+    ).catch(() => null)
+  : Promise.resolve(null);if (videoFile) {
 
   // Start video upload immediately
   const videoUploadPromise = uploadToR2(
