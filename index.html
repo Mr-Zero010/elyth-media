@@ -686,52 +686,61 @@ async function uploadToR2(file, progressCallback = null) {
   const uploadId = startData.uploadId;
   const key = startData.key;
 
-  const CHUNK_SIZE =
-    10 * 1024 * 1024;
+  // BIGGER chunks = MUCH faster
+const CHUNK_SIZE = 50 * 1024 * 1024;
 
-  const parts = [];
+const parts = [];
 
+const uploadPromises = [];
+
+let uploadedBytes = 0;
+
+const totalParts = Math.ceil(
+  file.size / CHUNK_SIZE
+);
+
+for (
   let partNumber = 1;
+  partNumber <= totalParts;
+  partNumber++
+) {
 
-  for (
-    let start = 0;
-    start < file.size;
-    start += CHUNK_SIZE
-  ) {
+  const start =
+    (partNumber - 1) * CHUNK_SIZE;
 
-    const end = Math.min(
-      start + CHUNK_SIZE,
-      file.size
-    );
+  const end = Math.min(
+    start + CHUNK_SIZE,
+    file.size
+  );
 
-    const chunk = file.slice(start, end);
+  const chunk = file.slice(start, end);
 
-    const uploadRes = await fetch(
-  R2_UPLOAD_ENDPOINT +
-    "/upload-part",
-      {
-        method: "PUT",
+  const promise = fetch(
+    R2_UPLOAD_ENDPOINT + "/upload-part",
+    {
+      method: "PUT",
 
-        headers: {
-          "Authorization":
-            "Bearer " + token,
+      headers: {
+        "Authorization":
+          "Bearer " + token,
 
-          "x-upload-id":
-            uploadId,
+        "x-upload-id":
+          uploadId,
 
-          "x-part-number":
-            String(partNumber),
+        "x-part-number":
+          String(partNumber),
 
-          "x-key":
+        "x-key":
           key,
 
-          "Content-Type":
-            "application/octet-stream"
-        },
+        "Content-Type":
+          "application/octet-stream"
+      },
 
-        body: chunk
-      }
-    );
+      body: chunk
+    }
+  )
+  .then(async (uploadRes) => {
 
     if (!uploadRes.ok) {
 
@@ -745,13 +754,11 @@ async function uploadToR2(file, progressCallback = null) {
     const uploadData =
       await uploadRes.json();
 
-    parts.push({
-      partNumber,
-      etag: uploadData.etag
-    });
+    uploadedBytes +=
+      (end - start);
 
     let percent = Math.round(
-      (end / file.size) * 100
+      (uploadedBytes / file.size) * 100
     );
 
     if (percent > 98) {
@@ -762,8 +769,26 @@ async function uploadToR2(file, progressCallback = null) {
       progressCallback(percent);
     }
 
-    partNumber++;
-  }
+    return {
+      partNumber,
+      etag: uploadData.etag
+    };
+  });
+
+  uploadPromises.push(promise);
+}
+
+// Upload ALL parts in parallel
+const uploadedParts =
+  await Promise.all(uploadPromises);
+
+// IMPORTANT: sort parts
+uploadedParts.sort(
+  (a, b) =>
+    a.partNumber - b.partNumber
+);
+
+parts.push(...uploadedParts);
 
   // COMPLETE MULTIPART
   const completeRes = await fetch(
