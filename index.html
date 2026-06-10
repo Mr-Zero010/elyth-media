@@ -1179,7 +1179,11 @@ uploadSubmit.addEventListener('click', async () => {
     const title = uploadTitle.value.trim();
     const description = uploadDescription.value.trim();
     const videoFile = uploadVideo.files[0] || null;
-    const layers = [];
+
+const modelFile =
+uploadModel.files[0] || null;
+
+const layers = [];
     
     const modelInputs = [
   {
