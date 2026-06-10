@@ -139,6 +139,34 @@ button{cursor:pointer}
   gap:14px;
 }
 
+.profile-video-card{
+  background:#fff;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  cursor:pointer;
+}
+
+.profile-video-card .thumb{
+  width:100%;
+  height:160px;
+}
+
+.profile-video-card .thumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.profile-video-card .meta{
+  padding:10px;
+}
+
+.profile-video-card .title{
+  margin:0;
+  font-size:15px;
+}
+
 /* VIDEO PAGE LAYOUT */
 .video-page{padding:12px;max-width:100%}
 .video-section{margin-bottom:24px}
@@ -1399,15 +1427,24 @@ ${(user.following||[]).length}
 <div class="profile-actions">
 
 ${
-currentUser &&
-currentUser.uid===userId
-?
+currentUser && currentUser.uid === userId
 
-'<button id="editProfileBtn" class="btn">Edit Profile</button>'
+? `
+<button id="editProfileBtn" class="btn">
+Edit Profile
+</button>
+`
 
-:
+: currentUser
 
-''
+? `
+<button id="followBtn" class="btn">
+Loading...
+</button>
+`
+
+: ''
+
 }
 
 </div>
@@ -1446,7 +1483,7 @@ class="profile-videos">
       document.createElement('div');
 
     card.className =
-      'video-card';
+'profile-video-card';
 
     card.innerHTML = `
       <div class="thumb">
@@ -1484,6 +1521,94 @@ document.getElementById(
  if(editBtn){
 
   editBtn.onclick = () => {
+
+    const followBtn =
+document.getElementById(
+'followBtn'
+);
+
+if(
+followBtn &&
+currentUser &&
+currentUser.uid !== userId
+){
+
+const myRef =
+doc(
+db,
+'users',
+currentUser.uid
+);
+
+const mySnap =
+await getDoc(myRef);
+
+const myData =
+mySnap.data() || {};
+
+const amFollowing =
+(myData.following || [])
+.includes(userId);
+
+followBtn.textContent =
+amFollowing
+? 'Unfollow'
+: 'Follow';
+
+followBtn.onclick =
+async () => {
+
+const nowFollowing =
+(myData.following || [])
+.includes(userId);
+
+if(nowFollowing){
+
+await updateDoc(
+myRef,
+{
+following:
+arrayRemove(userId)
+}
+);
+
+await updateDoc(
+userRef,
+{
+followers:
+arrayRemove(
+currentUser.uid
+)
+}
+);
+
+}else{
+
+await updateDoc(
+myRef,
+{
+following:
+arrayUnion(userId)
+}
+);
+
+await updateDoc(
+userRef,
+{
+followers:
+arrayUnion(
+currentUser.uid
+)
+}
+);
+
+}
+
+loadUserPage(userId);
+
+};
+
+}
 
     editDisplayName.value =
       user.displayName || '';
