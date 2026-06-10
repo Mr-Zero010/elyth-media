@@ -74,6 +74,12 @@ button{cursor:pointer}
 #uploadPanel{display:none;flex-direction:column;gap:6px;margin-left:16px;max-width:320px;position:fixed;bottom:90px;right:20px;background:var(--card);padding:12px;border-radius:var(--radius);box-shadow:var(--shadow)}
 #uploadPanel input,#uploadPanel textarea{padding:6px;border-radius:6px;border:1px solid #ccc;font-size:14px;font-family:inherit}
 #uploadStatus{color:var(--muted);font-size:13px;min-height:18px}
+.upload-label{
+  display:block;
+  margin-top:8px;
+  margin-bottom:4px;
+  font-weight:600;
+}
 /* Floating upload button */
 #fabUpload{position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:var(--blue);border-radius:50%;color:white;font-size:32px;line-height:52px;text-align:center;cursor:pointer;box-shadow:0 4px 12px rgba(11, 198, 255, 0.3)}
 #fabUpload:hover{box-shadow:0 6px 18px rgba(11, 198, 255, 0.8);transform:scale(1.05);transition: transform 0.15s ease}
@@ -181,8 +187,55 @@ button{cursor:pointer}
 <div id="uploadPanel">
   <input id="uploadTitle" type="text" placeholder="Title (video or model)" />
   <textarea id="uploadDescription" placeholder="Description" rows="2"></textarea>
-  <input id="uploadVideo" type="file" accept="video/*" />
-  <input id="uploadModel" type="file" accept=".glb,.gltf" />
+  <label class="upload-label" for="uploadVideo">
+🎥 Upload Video
+</label>
+<input
+  id="uploadVideo"
+  type="file"
+  accept="video/*"
+/>
+
+<h4>3D Layers</h4>
+
+<label>Layer 1 Title (optional)</label>
+<input
+  id="layer1Title"
+  type="text"
+  placeholder="Layer 1 title"
+/>
+
+<input
+  id="layer1Model"
+  type="file"
+  accept=".glb,.gltf"
+/>
+
+<label>Layer 2 Title (optional)</label>
+<input
+  id="layer2Title"
+  type="text"
+  placeholder="Layer 2 title"
+/>
+
+<input
+  id="layer2Model"
+  type="file"
+  accept=".glb,.gltf"
+/>
+
+<label>Layer 3 Title (optional)</label>
+<input
+  id="layer3Title"
+  type="text"
+  placeholder="Layer 3 title"
+/>
+
+<input
+  id="layer3Model"
+  type="file"
+  accept=".glb,.gltf"
+/>
   <button id="uploadSubmit" class="btn">Upload</button>
   <small id="uploadStatus"></small>
 </div>
@@ -307,6 +360,14 @@ const uploadStatus = document.getElementById('uploadStatus');
 const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const contentArea = document.getElementById('contentArea');
+/* 3D Layers */
+const layer1Title = document.getElementById('layer1Title');
+const layer2Title = document.getElementById('layer2Title');
+const layer3Title = document.getElementById('layer3Title');
+
+const layer1Model = document.getElementById('layer1Model');
+const layer2Model = document.getElementById('layer2Model');
+const layer3Model = document.getElementById('layer3Model');
 
 const editProfilePanel =
 document.getElementById(
@@ -1090,8 +1151,41 @@ uploadSubmit.addEventListener('click', async () => {
     const title = uploadTitle.value.trim();
     const description = uploadDescription.value.trim();
     const videoFile = uploadVideo.files[0] || null;
-    const modelFile = uploadModel.files[0] || null;
+    const layers = [];
+    
+    const modelInputs = [
+  {
+    title: layer1Title.value.trim(),
+    file: layer1Model.files[0]
+  },
+  {
+    title: layer2Title.value.trim(),
+    file: layer2Model.files[0]
+  },
+  {
+    title: layer3Title.value.trim(),
+    file: layer3Model.files[0]
+  }
+];
 
+for (const layer of modelInputs) {
+
+  if (!layer.file) continue;
+
+  uploadStatus.textContent =
+    "Uploading " +
+    (layer.title || "layer") +
+    "...";
+
+  const uploaded =
+    await uploadToR2(layer.file);
+
+  layers.push({
+    title: layer.title,
+    modelUrl: uploaded.url,
+    modelKey: uploaded.key
+  });
+}
     if (!title) {
       alert("Title required");
       return;
@@ -1196,6 +1290,7 @@ uploadSubmit.addEventListener('click', async () => {
       videoType,
       modelUrl,
       modelKey,
+      layers,
       thumbnailUrl,
       thumbnailKey
     });
