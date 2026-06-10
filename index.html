@@ -177,7 +177,12 @@ button{cursor:pointer}
 .model-section h3{margin:0 0 12px 0;color:var(--blue);font-size:18px;font-weight:600}
 
 .no-model-message{color:var(--muted);padding:20px;text-align:center;background:#f9fafb;border-radius:10px;font-size:14px}
-
+#layerButtons{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:12px;
+}
 /* 3D viewer within video page */
 #viewer3d{width:100%;height:420px;background:#111;border-radius:10px;overflow:hidden}
 </style>
@@ -1683,14 +1688,25 @@ async function loadVideoPage(videoId) {
   }
 
   // 3D MODEL SECTION
-  if (v.modelUrl) {
-    html += `
-      <div class="model-section">
-        <h3>🎨 3D Model Viewer</h3>
-        <div id="viewer3d"></div>
-      </div>
-    `;
-  } else if (v.videoUrl) {
+  const hasModels =
+  v.modelUrl ||
+  (v.layers && v.layers.length);
+
+if (hasModels) {
+
+  html += `
+    <div class="model-section">
+
+      <h3>🎨 3D Model Viewer</h3>
+
+      <div id="layerButtons"></div>
+
+      <div id="viewer3d"></div>
+
+    </div>
+  `;
+}
+  else if (v.videoUrl) {
     // Only show "not available" if there's a video but NO model
     html += `
       <div class="model-section">
@@ -1703,6 +1719,60 @@ async function loadVideoPage(videoId) {
 
   html += `</div>`;
   contentArea.innerHTML = html;
+
+const layerButtons =
+document.getElementById(
+  'layerButtons'
+);
+}
+
+if(layerButtons){
+
+  if(v.modelUrl){
+
+    const btn =
+      document.createElement('button');
+
+    btn.className = 'btn';
+
+    btn.textContent =
+      'Main Model';
+
+    btn.onclick = () => {
+      load3DViewer(v.modelUrl);
+    };
+
+    layerButtons.appendChild(btn);
+  }
+
+  (v.layers || []).forEach(
+    (layer,index) => {
+
+      const btn =
+        document.createElement(
+          'button'
+        );
+
+      btn.className = 'btn';
+
+      btn.textContent =
+        layer.title ||
+        `Layer ${index+1}`;
+
+      btn.onclick = () => {
+
+        load3DViewer(
+          layer.modelUrl
+        );
+
+      };
+
+      layerButtons.appendChild(btn);
+
+    }
+  );
+
+}
   const backBtn = document.getElementById('backBtn');
 
 if (backBtn) {
@@ -1760,11 +1830,22 @@ if (backBtn) {
   }
 
   // Initialize 3D viewer if model exists
-  if (v.modelUrl) {
-    setTimeout(() => {
-      load3DViewer(v.modelUrl);
-    }, 100);
-  }
+  const firstModel =
+
+v.modelUrl ||
+
+v.layers?.[0]?.modelUrl;
+
+if(firstModel){
+
+  setTimeout(() => {
+
+    load3DViewer(
+      firstModel
+    );
+
+  },100);
+
 }
 
 async function goHome() {
