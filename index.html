@@ -1512,17 +1512,8 @@ class="profile-videos">
       .appendChild(card);
 
   });
-
- const editBtn =
-document.getElementById(
-'editProfileBtn'
-);
-
- if(editBtn){
-
-  editBtn.onclick = () => {
-
-    const followBtn =
+//FOLLOW-UNFOLLOW
+  const followBtn =
 document.getElementById(
 'followBtn'
 );
@@ -1576,9 +1567,7 @@ await updateDoc(
 userRef,
 {
 followers:
-arrayRemove(
-currentUser.uid
-)
+arrayRemove(currentUser.uid)
 }
 );
 
@@ -1596,9 +1585,7 @@ await updateDoc(
 userRef,
 {
 followers:
-arrayUnion(
-currentUser.uid
-)
+arrayUnion(currentUser.uid)
 }
 );
 
@@ -1609,6 +1596,15 @@ loadUserPage(userId);
 };
 
 }
+
+ const editBtn =
+document.getElementById(
+'editProfileBtn'
+);
+
+ if(editBtn){
+
+  editBtn.onclick = () => {
 
     editDisplayName.value =
       user.displayName || '';
