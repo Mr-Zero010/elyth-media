@@ -74,12 +74,6 @@ button{cursor:pointer}
 #uploadPanel{display:none;flex-direction:column;gap:6px;margin-left:16px;max-width:320px;position:fixed;bottom:90px;right:20px;background:var(--card);padding:12px;border-radius:var(--radius);box-shadow:var(--shadow)}
 #uploadPanel input,#uploadPanel textarea{padding:6px;border-radius:6px;border:1px solid #ccc;font-size:14px;font-family:inherit}
 #uploadStatus{color:var(--muted);font-size:13px;min-height:18px}
-.upload-label{
-  display:block;
-  margin-top:8px;
-  margin-bottom:4px;
-  font-weight:600;
-}
 /* Floating upload button */
 #fabUpload{position:fixed;bottom:20px;right:20px;width:52px;height:52px;background:var(--blue);border-radius:50%;color:white;font-size:32px;line-height:52px;text-align:center;cursor:pointer;box-shadow:0 4px 12px rgba(11, 198, 255, 0.3)}
 #fabUpload:hover{box-shadow:0 6px 18px rgba(11, 198, 255, 0.8);transform:scale(1.05);transition: transform 0.15s ease}
@@ -87,85 +81,6 @@ button{cursor:pointer}
 .user-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .user-header img{width:80px;height:80px;border-radius:50%}
 .follow-count{color:var(--muted);font-size:14px;margin-left:8px}
-
-.profile-page{
-  max-width:900px;
-  margin:auto;
-}
-
-.profile-top{
-  display:flex;
-  gap:20px;
-  align-items:flex-start;
-  margin-bottom:24px;
-}
-
-.profile-pic{
-  width:120px;
-  height:120px;
-  border-radius:50%;
-  object-fit:cover;
-  border:4px solid #fff;
-  box-shadow:var(--shadow);
-}
-
-.profile-info h2{
-  margin:0;
-  font-size:28px;
-}
-
-.profile-bio{
-  margin-top:8px;
-  color:#555;
-  white-space:pre-wrap;
-}
-
-.profile-stats{
-  display:flex;
-  gap:20px;
-  margin-top:12px;
-  color:#666;
-  font-size:14px;
-}
-
-.profile-actions{
-  margin-top:16px;
-}
-
-.profile-videos{
-  display:grid;
-  grid-template-columns:
-  repeat(auto-fill,minmax(250px,1fr));
-  gap:14px;
-}
-
-.profile-video-card{
-  background:#fff;
-  border-radius:12px;
-  overflow:hidden;
-  box-shadow:var(--shadow);
-  cursor:pointer;
-}
-
-.profile-video-card .thumb{
-  width:100%;
-  height:160px;
-}
-
-.profile-video-card .thumb img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-.profile-video-card .meta{
-  padding:10px;
-}
-
-.profile-video-card .title{
-  margin:0;
-  font-size:15px;
-}
 
 /* VIDEO PAGE LAYOUT */
 .video-page{padding:12px;max-width:100%}
@@ -177,72 +92,10 @@ button{cursor:pointer}
 .model-section h3{margin:0 0 12px 0;color:var(--blue);font-size:18px;font-weight:600}
 
 .no-model-message{color:var(--muted);padding:20px;text-align:center;background:#f9fafb;border-radius:10px;font-size:14px}
-#layerButtons{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-bottom:12px;
-}
+
 /* 3D viewer within video page */
 #viewer3d{width:100%;height:420px;background:#111;border-radius:10px;overflow:hidden}
-/* ================================
-   BOTTOM NAVIGATION
-================================ */
-
-#bottomNav{
-  position:fixed;
-  left:50%;
-  bottom:0;
-  transform:translateX(-50%);
-
-  width:100%;
-  max-width:var(--max-width);
-  height:68px;
-
-  display:flex;
-  align-items:center;
-
-  background:#ffffff;
-  border-top:1px solid #e5e7eb;
-
-  z-index:9999;
-}
-
-.bottom-nav-btn{
-  flex:1;
-  height:100%;
-
-  border:0;
-  background:transparent;
-
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-
-  gap:4px;
-
-  color:#6b7280;
-  font-size:12px;
-  font-weight:600;
-
-  cursor:pointer;
-}
-
-.bottom-nav-btn .nav-icon{
-  font-size:25px;
-  line-height:25px;
-}
-
-.bottom-nav-btn.active{
-  color:var(--blue);
-}
-
-.bottom-nav-btn:hover{
-  background:#f8fafc;
-}
 </style>
-</head>
 <body>
 
 <div class="app">
@@ -260,23 +113,7 @@ button{cursor:pointer}
     <div class="top-actions">
       <button id="authBtn" class="btn">Sign in</button>
     </div>
-
   </header>
-
-  <!-- BOTTOM NAVIGATION -->
-<nav id="bottomNav">
-
-  <button id="homeNavBtn" class="bottom-nav-btn active">
-    <span class="nav-icon">⌂</span>
-    <span>Home</span>
-  </button>
-
-  <button id="profileNavBtn" class="bottom-nav-btn">
-    <span class="nav-icon">◯</span>
-    <span>Profile</span>
-  </button>
-
-</nav>
 
   <div id="contentArea">
     <div class="list" id="videoList">
@@ -292,118 +129,10 @@ button{cursor:pointer}
 <div id="uploadPanel">
   <input id="uploadTitle" type="text" placeholder="Title (video or model)" />
   <textarea id="uploadDescription" placeholder="Description" rows="2"></textarea>
-  <label class="upload-label" for="uploadVideo">
-🎥 Upload Video
-</label>
-<input
-  id="uploadVideo"
-  type="file"
-  accept="video/*"
-/>
-<label>Single 3D Model</label>
-
-<input
-  id="uploadModel"
-  type="file"
-  accept=".glb,.gltf"
-/>
-
-<h4>3D Layers</h4>
-
-<label>Layer 1 Title (optional)</label>
-<input
-  id="layer1Title"
-  type="text"
-  placeholder="Layer 1 title"
-/>
-
-<input
-  id="layer1Model"
-  type="file"
-  accept=".glb,.gltf"
-/>
-
-<label>Layer 2 Title (optional)</label>
-<input
-  id="layer2Title"
-  type="text"
-  placeholder="Layer 2 title"
-/>
-
-<input
-  id="layer2Model"
-  type="file"
-  accept=".glb,.gltf"
-/>
-
-<label>Layer 3 Title (optional)</label>
-<input
-  id="layer3Title"
-  type="text"
-  placeholder="Layer 3 title"
-/>
-
-<input
-  id="layer3Model"
-  type="file"
-  accept=".glb,.gltf"
-/>
+  <input id="uploadVideo" type="file" accept="video/*" />
+  <input id="uploadModel" type="file" accept=".glb,.gltf" />
   <button id="uploadSubmit" class="btn">Upload</button>
   <small id="uploadStatus"></small>
-</div>
-<div id="editProfilePanel" style="
-display:none;
-position:fixed;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-background:white;
-padding:20px;
-border-radius:12px;
-box-shadow:0 10px 30px rgba(0,0,0,.2);
-z-index:9999;
-width:350px;
-">
-
-<h2>Edit Profile</h2>
-
-<input
-id="editDisplayName"
-type="text"
-placeholder="Display Name"
-style="width:100%;margin-bottom:10px;"
->
-
-<textarea
-id="editBio"
-rows="4"
-placeholder="About yourself"
-style="width:100%;margin-bottom:10px;"
-></textarea>
-
-<input
-id="editProfilePicture"
-type="file"
-accept="image/*"
-style="margin-bottom:10px;"
->
-
-<div style="display:flex;gap:10px;">
-
-<button
-id="saveProfileBtn"
-class="btn">
-Save
-</button>
-
-<button
-id="cancelProfileBtn"
-class="btn-ghost">
-Cancel
-</button>
-
-</div>
-
 </div>
 
 <script type="module">
@@ -421,9 +150,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
-  onAuthStateChanged,
-  updateProfile
+  onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
 import {
   getFirestore,
   doc,
@@ -472,44 +201,6 @@ const uploadStatus = document.getElementById('uploadStatus');
 const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const contentArea = document.getElementById('contentArea');
-/* 3D Layers */
-const layer1Title = document.getElementById('layer1Title');
-const layer2Title = document.getElementById('layer2Title');
-const layer3Title = document.getElementById('layer3Title');
-
-const layer1Model = document.getElementById('layer1Model');
-const layer2Model = document.getElementById('layer2Model');
-const layer3Model = document.getElementById('layer3Model');
-
-const editProfilePanel =
-document.getElementById(
-'editProfilePanel'
-);
-
-const editDisplayName =
-document.getElementById(
-'editDisplayName'
-);
-
-const editBio =
-document.getElementById(
-'editBio'
-);
-
-const editProfilePicture =
-document.getElementById(
-'editProfilePicture'
-);
-
-const saveProfileBtn =
-document.getElementById(
-'saveProfileBtn'
-);
-
-const cancelProfileBtn =
-document.getElementById(
-'cancelProfileBtn'
-);
 
 let currentUser = null;
 
@@ -536,27 +227,13 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     const userRef = doc(db, 'users', user.uid);
     const snap = await getDoc(userRef);
-   
     const userDoc = {
-  displayName: user.displayName || 'Unnamed',
-  photoURL: user.photoURL || '',
-
-  bio: snap.exists()
-    ? (snap.data().bio || '')
-    : '',
-
-  followers: snap.exists()
-    ? (snap.data().followers || [])
-    : [],
-
-  following: snap.exists()
-    ? (snap.data().following || [])
-    : [],
-
-  joinedAt: snap.exists()
-    ? snap.data().joinedAt || serverTimestamp()
-    : serverTimestamp()
-};
+      displayName: user.displayName || 'Unnamed',
+      photoURL: user.photoURL || '',
+      followers: snap.exists() ? (snap.data().followers || []) : [],
+      following: snap.exists() ? (snap.data().following || []) : [],
+      joinedAt: snap.exists() ? snap.data().joinedAt || serverTimestamp() : serverTimestamp()
+    };
     await setDoc(userRef, userDoc, { merge: true });
   }
 
@@ -1263,45 +940,8 @@ uploadSubmit.addEventListener('click', async () => {
     const title = uploadTitle.value.trim();
     const description = uploadDescription.value.trim();
     const videoFile = uploadVideo.files[0] || null;
+    const modelFile = uploadModel.files[0] || null;
 
-const modelFile =
-uploadModel.files[0] || null;
-
-const layers = [];
-    
-    const modelInputs = [
-  {
-    title: layer1Title.value.trim(),
-    file: layer1Model.files[0]
-  },
-  {
-    title: layer2Title.value.trim(),
-    file: layer2Model.files[0]
-  },
-  {
-    title: layer3Title.value.trim(),
-    file: layer3Model.files[0]
-  }
-];
-
-for (const layer of modelInputs) {
-
-  if (!layer.file) continue;
-
-  uploadStatus.textContent =
-    "Uploading " +
-    (layer.title || "layer") +
-    "...";
-
-  const uploaded =
-    await uploadToR2(layer.file);
-
-  layers.push({
-    title: layer.title,
-    modelUrl: uploaded.url,
-    modelKey: uploaded.key
-  });
-}
     if (!title) {
       alert("Title required");
       return;
@@ -1406,7 +1046,6 @@ for (const layer of modelInputs) {
       videoType,
       modelUrl,
       modelKey,
-      layers,
       thumbnailUrl,
       thumbnailKey
     });
@@ -1425,286 +1064,93 @@ for (const layer of modelInputs) {
 });
 
 async function loadUserPage(userId) {
+  contentArea.innerHTML = '<p>Loading user...</p>';
 
-  contentArea.innerHTML =
-    '<p>Loading profile...</p>';
+  const userDocRef = doc(db, 'users', userId);
+  const snap = await getDoc(userDocRef);
 
-  const userRef =
-    doc(db,'users',userId);
-
-  const snap =
-    await getDoc(userRef);
-
-  if(!snap.exists()){
-
-    contentArea.innerHTML =
-      '<p>User not found</p>';
-
+  if (!snap.exists()) {
+    contentArea.innerHTML = '<p>User not found</p>';
     return;
   }
 
   const user = snap.data();
-
-  const uploadsSnap =
-    await getDocs(
-      query(
-        collection(db,'videos'),
-        where('ownerId','==',userId)
-      )
-    );
-
-  const uploadCount =
-    uploadsSnap.size;
+  let isFollowing = currentUser && (user.followers || []).includes(currentUser.uid);
 
   contentArea.innerHTML = `
+    <div style="padding:14px">
+      <div class="user-header">
+        <img src="${escapeHTML(user.photoURL || '')}">
+        <div>
+          <h2>${escapeHTML(user.displayName || 'Unnamed')}</h2>
+          <button id="followBtn" class="btn-ghost">
+            ${isFollowing ? 'Following' : 'Follow'}
+          </button>
+          <span class="follow-count" id="followCount">
+            ${(user.followers || []).length} followers
+          </span>
+        </div>
+      </div>
 
-<div class="profile-page">
+      <h3>Uploads</h3>
+      <div id="userVideos"></div>
+    </div>
+  `;
 
-<button id="backBtn"
-class="back-btn">
-← Back
-</button>
+  const followBtn = document.getElementById('followBtn');
+  const followCountElem = document.getElementById('followCount');
 
-<div class="profile-top">
+  followBtn.addEventListener('click', async () => {
+    if (!currentUser) {
+      alert('Sign in to follow');
+      return;
+    }
 
-<img
-class="profile-pic"
-src="${
-user.photoURL ||
-'https://placehold.co/200'
-}">
+    const userRef = doc(db, 'users', userId);
 
-<div class="profile-info">
+    if (isFollowing) {
+      await updateDoc(userRef, {
+        followers: arrayRemove(currentUser.uid)
+      });
+      isFollowing = false;
+      followBtn.textContent = 'Follow';
+      followCountElem.textContent = (parseInt(followCountElem.textContent) - 1) + ' followers';
+    } else {
+      await updateDoc(userRef, {
+        followers: arrayUnion(currentUser.uid)
+      });
+      isFollowing = true;
+      followBtn.textContent = 'Following';
+      followCountElem.textContent = (parseInt(followCountElem.textContent) + 1) + ' followers';
+    }
+  });
 
-<h2>
-${escapeHTML(
-user.displayName || 'User'
-)}
-</h2>
-
-<div class="profile-bio">
-
-${
-escapeHTML(
-user.bio ||
-'No description yet.'
-)
-}
-
-</div>
-
-<div class="profile-stats">
-
-<span>
-${uploadCount}
- Uploads
-</span>
-
-<span>
-${(user.followers||[]).length}
- Followers
-</span>
-
-<span>
-${(user.following||[]).length}
- Following
-</span>
-
-</div>
-
-<div class="profile-actions">
-
-${
-currentUser && currentUser.uid === userId
-
-? `
-<button id="editProfileBtn" class="btn">
-Edit Profile
-</button>
-`
-
-: currentUser
-
-? `
-<button id="followBtn" class="btn">
-Loading...
-</button>
-`
-
-: ''
-
-}
-
-</div>
-
-</div>
-
-</div>
-
-<h3>Videos</h3>
-
-<div
-id="profileVideos"
-class="profile-videos">
-</div>
-
-</div>
-`;
-
-  document
-  .getElementById('backBtn')
-  .addEventListener(
-    'click',
-    goHome
+  const videosSnap = await getDocs(
+    query(
+      collection(db, 'videos'),
+      where('ownerId', '==', userId),
+      orderBy('uploadDate', 'desc')
+    )
   );
 
-  const videosContainer =
-    document.getElementById(
-      'profileVideos'
-    );
+  const userVideosDiv = document.getElementById('userVideos');
+  userVideosDiv.innerHTML = '';
 
-  uploadsSnap.forEach(docSnap=>{
-
-    const v = docSnap.data();
-
-    const card =
-      document.createElement('div');
-
-    card.className =
-'profile-video-card';
-
+  videosSnap.docs.forEach(d => {
+    const v = d.data();
+    const card = document.createElement('div');
+    card.className = 'video-card';
     card.innerHTML = `
-      <div class="thumb">
-        <img src="${
-          v.thumbnailUrl ||
-          'https://placehold.co/320x180'
-        }">
-      </div>
-
+      <div class="thumb"><img src="${v.thumbnailUrl || 'https://placehold.co/320x180/111/FFF?text=3D+Model'}"></div>
       <div class="meta">
-        <h3 class="title">
-          ${escapeHTML(v.title)}
-        </h3>
+        <h3 class="title">${escapeHTML(v.title)}</h3>
       </div>
     `;
-
-    card.onclick=()=>{
-
-      loadVideoPage(
-        docSnap.id
-      );
-
-    };
-
-    videosContainer
-      .appendChild(card);
-
+    card.querySelector('.title').addEventListener('click', () => loadVideoPage(d.id));
+    userVideosDiv.appendChild(card);
   });
-//FOLLOW-UNFOLLOW
-  const followBtn =
-document.getElementById(
-'followBtn'
-);
-
-if(
-followBtn &&
-currentUser &&
-currentUser.uid !== userId
-){
-
-const myRef =
-doc(
-db,
-'users',
-currentUser.uid
-);
-
-const mySnap =
-await getDoc(myRef);
-
-const myData =
-mySnap.data() || {};
-
-const amFollowing =
-(myData.following || [])
-.includes(userId);
-
-followBtn.textContent =
-amFollowing
-? 'Unfollow'
-: 'Follow';
-
-followBtn.onclick =
-async () => {
-
-const nowFollowing =
-(myData.following || [])
-.includes(userId);
-
-if(nowFollowing){
-
-await updateDoc(
-myRef,
-{
-following:
-arrayRemove(userId)
-}
-);
-
-await updateDoc(
-userRef,
-{
-followers:
-arrayRemove(currentUser.uid)
-}
-);
-
-}else{
-
-await updateDoc(
-myRef,
-{
-following:
-arrayUnion(userId)
-}
-);
-
-await updateDoc(
-userRef,
-{
-followers:
-arrayUnion(currentUser.uid)
-}
-);
-
 }
 
-loadUserPage(userId);
-
-};
-
-}
-
- const editBtn =
-document.getElementById(
-'editProfileBtn'
-);
-
- if(editBtn){
-
-  editBtn.onclick = () => {
-
-    editDisplayName.value =
-      user.displayName || '';
-
-    editBio.value =
-      user.bio || '';
-
-    editProfilePanel.style.display =
-      'block';
-  };
-}
-}
 /* ---------- Video page (video + optional inline 3D viewer) ---------- */
 async function loadVideoPage(videoId) {
   if (__threeInstance && __threeInstance.cleanup) {
@@ -1760,25 +1206,14 @@ async function loadVideoPage(videoId) {
   }
 
   // 3D MODEL SECTION
-  const hasModels =
-  v.modelUrl ||
-  (v.layers && v.layers.length);
-
-if (hasModels) {
-
-  html += `
-    <div class="model-section">
-
-      <h3>🎨 3D Model Viewer</h3>
-
-      <div id="layerButtons"></div>
-
-      <div id="viewer3d"></div>
-
-    </div>
-  `;
-}
-  else if (v.videoUrl) {
+  if (v.modelUrl) {
+    html += `
+      <div class="model-section">
+        <h3>🎨 3D Model Viewer</h3>
+        <div id="viewer3d"></div>
+      </div>
+    `;
+  } else if (v.videoUrl) {
     // Only show "not available" if there's a video but NO model
     html += `
       <div class="model-section">
@@ -1791,60 +1226,6 @@ if (hasModels) {
 
   html += `</div>`;
   contentArea.innerHTML = html;
-
-const layerButtons =
-document.getElementById(
-  'layerButtons'
-);
-}
-
-if(layerButtons){
-
-  if(v.modelUrl){
-
-    const btn =
-      document.createElement('button');
-
-    btn.className = 'btn';
-
-    btn.textContent =
-      'Main Model';
-
-    btn.onclick = () => {
-      load3DViewer(v.modelUrl);
-    };
-
-    layerButtons.appendChild(btn);
-  }
-
-  (v.layers || []).forEach(
-    (layer,index) => {
-
-      const btn =
-        document.createElement(
-          'button'
-        );
-
-      btn.className = 'btn';
-
-      btn.textContent =
-        layer.title ||
-        `Layer ${index+1}`;
-
-      btn.onclick = () => {
-
-        load3DViewer(
-          layer.modelUrl
-        );
-
-      };
-
-      layerButtons.appendChild(btn);
-
-    }
-  );
-
-}
   const backBtn = document.getElementById('backBtn');
 
 if (backBtn) {
@@ -1902,22 +1283,11 @@ if (backBtn) {
   }
 
   // Initialize 3D viewer if model exists
-  const firstModel =
-
-v.modelUrl ||
-
-v.layers?.[0]?.modelUrl;
-
-if(firstModel){
-
-  setTimeout(() => {
-
-    load3DViewer(
-      firstModel
-    );
-
-  },100);
-
+  if (v.modelUrl) {
+    setTimeout(() => {
+      load3DViewer(v.modelUrl);
+    }, 100);
+  }
 }
 
 async function goHome() {
@@ -1940,75 +1310,6 @@ async function goHome() {
 
   renderVideos(videos);
 }
-
-saveProfileBtn.addEventListener(
-'click',
-async () => {
-
-  if(!currentUser) return;
-
-  let photoURL = '';
-
-  const image =
-    editProfilePicture.files[0];
-
-  if(image){
-
-    const uploaded =
-      await uploadToR2(image);
-
-    photoURL =
-      uploaded.url;
-  }
-
-  await updateDoc(
-  doc(
-    db,
-    'users',
-    currentUser.uid
-  ),
-  {
-    displayName:
-      editDisplayName.value.trim(),
-
-    bio:
-      editBio.value.trim(),
-
-    ...(photoURL
-      ? { photoURL }
-      : {})
-  }
-);
-
-await updateProfile(
-  currentUser,
-  {
-    displayName:
-      editDisplayName.value.trim(),
-
-    ...(photoURL
-      ? { photoURL }
-      : {})
-  }
-);
-
-await currentUser.reload();
-
-editProfilePanel.style.display =
-  'none';
-
-loadUserPage(
-  currentUser.uid
-);
-});
-cancelProfileBtn.addEventListener(
-'click',
-() => {
-
-  editProfilePanel.style.display =
-    'none';
-
-});
 
 document.addEventListener('DOMContentLoaded', () => {
   // Nothing special needed
