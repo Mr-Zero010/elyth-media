@@ -1,4 +1,3 @@
-<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -95,6 +94,29 @@ button{cursor:pointer}
 
 /* 3D viewer within video page */
 #viewer3d{width:100%;height:420px;background:#111;border-radius:10px;overflow:hidden}
+
+#bottomNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: var(--max-width);
+  margin: 10px auto 0;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.nav-item {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 8px 12px;
+}
+
+.nav-item:hover {
+  opacity: 0.8;
+}
 </style>
 <body>
 
@@ -113,6 +135,15 @@ button{cursor:pointer}
     <div class="top-actions">
       <button id="authBtn" class="btn">Sign in</button>
     </div>
+    <nav id="bottomNav">
+  <button id="homeNavBtn" class="nav-item">
+    ⌂ Home
+  </button>
+
+  <button id="profileNavBtn" class="nav-item">
+    ◯ Profile
+  </button>
+</nav>
   </header>
 
   <div id="contentArea">
@@ -163,6 +194,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+   writeBatch,
   arrayUnion,
   arrayRemove,
   query,
@@ -820,7 +852,7 @@ parts.push(...uploadedParts);
     );
 
   }
-
+  
   const completeData =
     await completeRes.json();
 
@@ -1064,7 +1096,7 @@ uploadSubmit.addEventListener('click', async () => {
 });
 
 async function loadUserPage(userId) {
-  contentArea.innerHTML = '<p>Loading user...</p>';
+  contentArea.innerHTML = '<p>Loading profile...</p>';
 
   const userDocRef = doc(db, 'users', userId);
   const snap = await getDoc(userDocRef);
@@ -1075,80 +1107,385 @@ async function loadUserPage(userId) {
   }
 
   const user = snap.data();
-  let isFollowing = currentUser && (user.followers || []).includes(currentUser.uid);
 
-  contentArea.innerHTML = `
-    <div style="padding:14px">
-      <div class="user-header">
-        <img src="${escapeHTML(user.photoURL || '')}">
-        <div>
-          <h2>${escapeHTML(user.displayName || 'Unnamed')}</h2>
-          <button id="followBtn" class="btn-ghost">
-            ${isFollowing ? 'Following' : 'Follow'}
-          </button>
-          <span class="follow-count" id="followCount">
-            ${(user.followers || []).length} followers
-          </span>
-        </div>
-      </div>
+  const isOwnProfile =
+    currentUser && currentUser.uid === userId;
 
-      <h3>Uploads</h3>
-      <div id="userVideos"></div>
-    </div>
-  `;
+  const followers = user.followers || [];
+  const following = user.following || [];
 
-  const followBtn = document.getElementById('followBtn');
-  const followCountElem = document.getElementById('followCount');
-
-  followBtn.addEventListener('click', async () => {
-    if (!currentUser) {
-      alert('Sign in to follow');
-      return;
-    }
-
-    const userRef = doc(db, 'users', userId);
-
-    if (isFollowing) {
-      await updateDoc(userRef, {
-        followers: arrayRemove(currentUser.uid)
-      });
-      isFollowing = false;
-      followBtn.textContent = 'Follow';
-      followCountElem.textContent = (parseInt(followCountElem.textContent) - 1) + ' followers';
-    } else {
-      await updateDoc(userRef, {
-        followers: arrayUnion(currentUser.uid)
-      });
-      isFollowing = true;
-      followBtn.textContent = 'Following';
-      followCountElem.textContent = (parseInt(followCountElem.textContent) + 1) + ' followers';
-    }
-  });
+  /* ================= GET USER VIDEOS ================= */
 
   const videosSnap = await getDocs(
     query(
       collection(db, 'videos'),
-      where('ownerId', '==', userId),
-      orderBy('uploadDate', 'desc')
+      where('ownerId', '==', userId)
     )
   );
 
-  const userVideosDiv = document.getElementById('userVideos');
-  userVideosDiv.innerHTML = '';
+  const videos = videosSnap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
 
-  videosSnap.docs.forEach(d => {
-    const v = d.data();
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    card.innerHTML = `
-      <div class="thumb"><img src="${v.thumbnailUrl || 'https://placehold.co/320x180/111/FFF?text=3D+Model'}"></div>
-      <div class="meta">
-        <h3 class="title">${escapeHTML(v.title)}</h3>
-      </div>
-    `;
-    card.querySelector('.title').addEventListener('click', () => loadVideoPage(d.id));
-    userVideosDiv.appendChild(card);
+  // Sort newest first without requiring a Firestore index
+  videos.sort((a, b) => {
+    const aTime = a.uploadDate?.toMillis
+      ? a.uploadDate.toMillis()
+      : 0;
+
+    const bTime = b.uploadDate?.toMillis
+      ? b.uploadDate.toMillis()
+      : 0;
+
+    return bTime - aTime;
   });
+
+  /* ================= PROFILE HTML ================= */
+
+  contentArea.innerHTML = `
+    <div class="profile-page">
+
+      <div class="profile-header">
+
+        <img
+          class="profile-picture"
+          src="${escapeHTML(user.photoURL || '')}"
+          onerror="this.style.display='none'"
+        >
+
+        <div class="profile-info">
+
+          <h2>
+            ${escapeHTML(user.displayName || 'Unnamed')}
+          </h2>
+
+          <p class="profile-bio">
+            ${escapeHTML(user.bio || '')}
+          </p>
+
+          <div class="profile-stats">
+
+            <span>
+              <strong>${videos.length}</strong>
+              Videos
+            </span>
+
+            <span>
+              <strong id="profileFollowerCount">
+                ${followers.length}
+              </strong>
+              Followers
+            </span>
+
+            <span>
+              <strong>
+                ${following.length}
+              </strong>
+              Following
+            </span>
+
+          </div>
+
+          ${
+            isOwnProfile
+              ? `
+                <button
+                  id="editProfileBtn"
+                  class="btn"
+                >
+                  Edit Profile
+                </button>
+              `
+              : `
+                <button
+                  id="followBtn"
+                  class="btn-ghost"
+                >
+                  ${
+                    currentUser &&
+                    followers.includes(currentUser.uid)
+                      ? 'Following'
+                      : 'Follow'
+                  }
+                </button>
+              `
+          }
+
+        </div>
+
+      </div>
+
+      <hr>
+
+      <h3>Videos</h3>
+
+      <div id="userVideos" class="list"></div>
+
+      ${
+        isOwnProfile
+          ? `
+            <hr>
+
+            <h3>Following</h3>
+
+            <div id="followingList">
+              <p>Loading following...</p>
+            </div>
+          `
+          : ''
+      }
+
+    </div>
+  `;
+
+  /* ================= SHOW VIDEOS ================= */
+
+  const userVideosDiv =
+    document.getElementById('userVideos');
+
+  if (videos.length === 0) {
+
+    userVideosDiv.innerHTML =
+      '<p>No videos uploaded yet.</p>';
+
+  } else {
+
+    videos.forEach(v => {
+
+      const card =
+        document.createElement('div');
+
+      card.className = 'video-card';
+
+      card.innerHTML = `
+        <div class="thumb">
+          <img
+            src="${
+              escapeHTML(
+                v.thumbnailUrl ||
+                'https://placehold.co/320x180/111/FFF?text=Video'
+              )
+            }"
+          >
+        </div>
+
+        <div class="meta">
+
+          <h3 class="title">
+            ${escapeHTML(v.title || 'Untitled')}
+          </h3>
+
+        </div>
+      `;
+
+      card
+        .querySelector('.title')
+        .addEventListener(
+          'click',
+          () => loadVideoPage(v.id)
+        );
+
+      userVideosDiv.appendChild(card);
+    });
+  }
+
+  /* ================= OWN PROFILE ================= */
+
+  if (isOwnProfile) {
+
+    const editProfileBtn =
+      document.getElementById('editProfileBtn');
+
+    if (editProfileBtn) {
+
+      editProfileBtn.addEventListener(
+        'click',
+        () => {
+
+          alert(
+            'Edit Profile will be added in the next V18 step.'
+          );
+
+        }
+      );
+    }
+
+    /* ================= FOLLOWING LIST ================= */
+
+    const followingList =
+      document.getElementById('followingList');
+
+    if (followingList) {
+
+      if (following.length === 0) {
+
+        followingList.innerHTML =
+          '<p>You are not following anyone yet.</p>';
+
+      } else {
+
+        followingList.innerHTML = '';
+
+        for (const followedUserId of following) {
+
+          const followedRef =
+            doc(db, 'users', followedUserId);
+
+          const followedSnap =
+            await getDoc(followedRef);
+
+          if (!followedSnap.exists()) {
+            continue;
+          }
+
+          const followedUser =
+            followedSnap.data();
+
+          const item =
+            document.createElement('div');
+
+          item.className = 'following-item';
+
+          item.innerHTML = `
+            <img
+              src="${escapeHTML(
+                followedUser.photoURL || ''
+              )}"
+              class="following-picture"
+              onerror="this.style.display='none'"
+            >
+
+            <button class="following-name">
+              ${escapeHTML(
+                followedUser.displayName ||
+                'Unnamed'
+              )}
+            </button>
+          `;
+
+          item
+            .querySelector('.following-name')
+            .addEventListener(
+              'click',
+              () => loadUserPage(followedUserId)
+            );
+
+          followingList.appendChild(item);
+        }
+
+      }
+    }
+
+    return;
+  }
+
+  /* ================= OTHER USER PROFILE ================= */
+ const followBtn =
+    document.getElementById('followBtn');
+
+  const followCountElem =
+    document.getElementById(
+      'profileFollowerCount'
+    );
+
+  if (!followBtn) {
+    return;
+  }
+
+  let isFollowing =
+    currentUser &&
+    followers.includes(currentUser.uid);
+
+  followBtn.addEventListener(
+    'click',
+    async () => {
+
+      if (!currentUser) {
+
+        alert('Sign in to follow');
+        return;
+
+      }
+     if (currentUser.uid === userId) {
+        return;
+      }
+
+      const targetRef =
+        doc(db, 'users', userId);
+
+      const myRef =
+        doc(db, 'users', currentUser.uid);
+
+      const batch =
+        writeBatch(db);
+     
+        try {
+       followBtn.disabled = true;
+
+        if (isFollowing) {
+
+          batch.update(targetRef, {
+            followers:
+              arrayRemove(currentUser.uid)
+          });
+
+          batch.update(myRef, {
+            following:
+              arrayRemove(userId)
+          });
+
+          await batch.commit();
+
+          isFollowing = false;
+
+          followBtn.textContent =
+            'Follow';
+
+          followCountElem.textContent =
+            Number(followCountElem.textContent) - 1;
+
+    } else {
+          batch.update(targetRef, {
+            followers:
+              arrayUnion(currentUser.uid)
+          });
+
+          batch.update(myRef, {
+            following:
+              arrayUnion(userId)
+          });
+
+          await batch.commit();
+
+          isFollowing = true;
+
+          followBtn.textContent =
+            'Following';
+
+          followCountElem.textContent =
+            Number(followCountElem.textContent) + 1;
+        }
+
+      } catch (err) {
+
+        console.error(
+          'Follow/unfollow failed:',
+          err
+        );
+
+        alert(
+          'Follow update failed: ' +
+          err.message
+        );
+
+      } finally {
+followBtn.disabled = false;
+
+      }
+
+    }
+  );
 }
 
 /* ---------- Video page (video + optional inline 3D viewer) ---------- */
@@ -1261,12 +1598,10 @@ if (backBtn) {
             throw new Error("R2 delete failed: " + key);
            }
         }
-
-        await deleteDoc(doc(db, "videos", videoId));
-        alert("Deleted");
-        goHome();
-
-      } catch (err) {
+       await deleteDoc(doc(db, "videos", videoId));
+    alert("Deleted");
+    goHome();
+     } catch (err) {
         console.error(err);
         alert("Delete failed: " + err.message);
       }
@@ -1309,6 +1644,28 @@ async function goHome() {
   }));
 
   renderVideos(videos);
+}
+// ================= V18 BOTTOM NAV =================
+
+const homeNavBtn = document.getElementById('homeNavBtn');
+const profileNavBtn = document.getElementById('profileNavBtn');
+
+if (homeNavBtn) {
+  homeNavBtn.addEventListener('click', () => {
+    goHome();
+  });
+}
+
+if (profileNavBtn) {
+  profileNavBtn.addEventListener('click', () => {
+
+    if (!currentUser) {
+      alert('Sign in to view your profile');
+      return;
+    }
+
+    loadUserPage(currentUser.uid);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
