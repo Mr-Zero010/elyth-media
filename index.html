@@ -95,6 +95,77 @@ button{cursor:pointer}
 
 /* 3D viewer within video page */
 #viewer3d{width:100%;height:420px;background:#111;border-radius:10px;overflow:hidden}
+/* ================================
+   ELYTH BOTTOM NAVIGATION
+================================ */
+
+.bottom-nav{
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:70px;
+  background:#fff;
+  border-top:1px solid #e5e7eb;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:40px;
+  z-index:9999;
+}
+
+.nav-item{
+  background:none;
+  border:none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  color:#6b7280;
+  font-size:12px;
+  min-width:70px;
+  height:60px;
+}
+
+.nav-item .nav-icon{
+  font-size:22px;
+  line-height:22px;
+}
+
+.nav-item.active{
+  color:var(--blue);
+  font-weight:700;
+}
+
+/* Upload button */
+.nav-upload{
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  border:none;
+  background:var(--blue);
+  color:white;
+  font-size:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 12px rgba(11,198,255,.3);
+}
+
+/* Mobile */
+@media (max-width:600px){
+
+  .bottom-nav{
+    justify-content:space-around;
+    gap:0;
+  }
+
+  .nav-item{
+    min-width:60px;
+  }
+
+}
 </style>
 <body>
 
@@ -123,7 +194,39 @@ button{cursor:pointer}
 </div>
 
 <!-- Floating Upload Button -->
-<div id="fabUpload" title="Upload Video or Model" aria-label="Upload">+</div>
+<!-- Bottom Navigation -->
+
+<nav class="bottom-nav">
+
+  <button
+    id="navHome"
+    class="nav-item active"
+    aria-label="Home"
+  >
+    <span class="nav-icon">⌂</span>
+    <span>Home</span>
+  </button>
+
+
+  <button
+    id="navUpload"
+    class="nav-upload"
+    aria-label="Upload"
+  >
+    +
+  </button>
+
+
+  <button
+    id="navProfile"
+    class="nav-item"
+    aria-label="Profile"
+  >
+    <span class="nav-icon">👤</span>
+    <span>Profile</span>
+  </button>
+
+</nav>
 
 <!-- Upload Panel -->
 <div id="uploadPanel">
@@ -190,7 +293,9 @@ const provider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
 const authBtn = document.getElementById('authBtn');
-const fabUpload = document.getElementById('fabUpload');
+const navHome = document.getElementById('navHome');
+const navUpload = document.getElementById('navUpload');
+const navProfile = document.getElementById('navProfile');
 const uploadPanel = document.getElementById('uploadPanel');
 const uploadTitle = document.getElementById('uploadTitle');
 const uploadDescription = document.getElementById('uploadDescription');
@@ -236,8 +341,7 @@ onAuthStateChanged(auth, async (user) => {
     };
     await setDoc(userRef, userDoc, { merge: true });
   }
-
-  fabUpload.style.display = 'block';
+  
 });
 
 function escapeHTML(s){ return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -298,9 +402,67 @@ function searchVideos() {
 searchBtn.addEventListener('click', searchVideos);
 searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') searchVideos(); });
 
-fabUpload.addEventListener('click', () => {
-  if (!currentUser) { alert('Sign in to upload'); return; }
-  uploadPanel.style.display = uploadPanel.style.display === 'flex' ? 'none' : 'flex';
+navUpload.addEventListener('click', () => {
+
+  if (!currentUser) {
+    alert('Sign in to upload');
+    return;
+  }
+
+  uploadPanel.style.display =
+    uploadPanel.style.display === 'flex'
+      ? 'none'
+      : 'flex';
+
+});
+/* ================================
+   BOTTOM NAVIGATION
+================================ */
+
+function setActiveNav(activeButton){
+
+  document
+    .querySelectorAll('.nav-item')
+    .forEach(btn => btn.classList.remove('active'));
+
+  if (activeButton) {
+    activeButton.classList.add('active');
+  }
+
+}
+
+
+/* HOME */
+
+navHome.addEventListener('click', async () => {
+
+  setActiveNav(navHome);
+
+  if (__threeInstance && __threeInstance.cleanup) {
+    __threeInstance.cleanup();
+    __threeInstance = null;
+  }
+
+  await goHome();
+
+});
+
+
+/* PROFILE */
+
+navProfile.addEventListener('click', () => {
+
+  if (!currentUser) {
+
+    alert('Sign in to view your profile');
+
+    return;
+  }
+
+  setActiveNav(navProfile);
+
+  loadUserPage(currentUser.uid);
+
 });
 
 let __threeInstance = null;
@@ -1063,92 +1225,640 @@ uploadSubmit.addEventListener('click', async () => {
   }
 });
 
+/* =================================
+   USER PROFILE PAGE
+================================= */
+
 async function loadUserPage(userId) {
-  contentArea.innerHTML = '<p>Loading user...</p>';
 
-  const userDocRef = doc(db, 'users', userId);
-  const snap = await getDoc(userDocRef);
+  // Clean up 3D viewer if open
+  if (__threeInstance && __threeInstance.cleanup) {
+    try {
+      __threeInstance.cleanup();
+    } catch (e) {
+      console.warn(e);
+    }
 
-  if (!snap.exists()) {
-    contentArea.innerHTML = '<p>User not found</p>';
-    return;
+    __threeInstance = null;
   }
 
-  const user = snap.data();
-  let isFollowing = currentUser && (user.followers || []).includes(currentUser.uid);
-
   contentArea.innerHTML = `
-    <div style="padding:14px">
-      <div class="user-header">
-        <img src="${escapeHTML(user.photoURL || '')}">
-        <div>
-          <h2>${escapeHTML(user.displayName || 'Unnamed')}</h2>
-          <button id="followBtn" class="btn-ghost">
-            ${isFollowing ? 'Following' : 'Follow'}
-          </button>
-          <span class="follow-count" id="followCount">
-            ${(user.followers || []).length} followers
-          </span>
-        </div>
-      </div>
-
-      <h3>Uploads</h3>
-      <div id="userVideos"></div>
+    <div class="profile-page">
+      <p style="color:#888;">Loading profile...</p>
     </div>
   `;
 
-  const followBtn = document.getElementById('followBtn');
-  const followCountElem = document.getElementById('followCount');
+  try {
 
-  followBtn.addEventListener('click', async () => {
-    if (!currentUser) {
-      alert('Sign in to follow');
+    /* =============================
+       GET USER DATA
+    ============================= */
+
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+
+      contentArea.innerHTML = `
+        <div style="padding:20px">
+          <p>User not found.</p>
+        </div>
+      `;
+
       return;
     }
 
-    const userRef = doc(db, 'users', userId);
+    const user = userSnap.data();
 
-    if (isFollowing) {
-      await updateDoc(userRef, {
-        followers: arrayRemove(currentUser.uid)
-      });
-      isFollowing = false;
-      followBtn.textContent = 'Follow';
-      followCountElem.textContent = (parseInt(followCountElem.textContent) - 1) + ' followers';
-    } else {
-      await updateDoc(userRef, {
-        followers: arrayUnion(currentUser.uid)
-      });
-      isFollowing = true;
-      followBtn.textContent = 'Following';
-      followCountElem.textContent = (parseInt(followCountElem.textContent) + 1) + ' followers';
-    }
-  });
+    const followers = user.followers || [];
+    const following = user.following || [];
 
-  const videosSnap = await getDocs(
-    query(
-      collection(db, 'videos'),
-      where('ownerId', '==', userId),
-      orderBy('uploadDate', 'desc')
-    )
-  );
+    const isOwnProfile =
+      currentUser &&
+      currentUser.uid === userId;
 
-  const userVideosDiv = document.getElementById('userVideos');
-  userVideosDiv.innerHTML = '';
+    const isFollowing =
+      currentUser &&
+      followers.includes(currentUser.uid);
 
-  videosSnap.docs.forEach(d => {
-    const v = d.data();
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    card.innerHTML = `
-      <div class="thumb"><img src="${v.thumbnailUrl || 'https://placehold.co/320x180/111/FFF?text=3D+Model'}"></div>
-      <div class="meta">
-        <h3 class="title">${escapeHTML(v.title)}</h3>
+
+    /* =============================
+       LOAD USER UPLOADS
+    ============================= */
+
+    const uploadsQuery = query(
+      collection(db, "videos"),
+      where("ownerId", "==", userId),
+      orderBy("uploadDate", "desc")
+    );
+
+    const uploadsSnap =
+      await getDocs(uploadsQuery);
+
+    const uploads =
+      uploadsSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }));
+
+
+    /* =============================
+       PROFILE HTML
+    ============================= */
+
+    contentArea.innerHTML = `
+
+      <div class="profile-page"
+        style="
+          padding:20px;
+          max-width:900px;
+          margin:auto;
+        "
+      >
+
+        <!-- PROFILE HEADER -->
+
+        <div
+          style="
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            text-align:center;
+            padding:20px;
+            background:white;
+            border-radius:16px;
+            box-shadow:var(--shadow);
+          "
+        >
+
+          <!-- PROFILE IMAGE -->
+
+          ${
+            user.photoURL
+              ? `
+                <img
+                  src="${escapeHTML(user.photoURL)}"
+                  style="
+                    width:100px;
+                    height:100px;
+                    border-radius:50%;
+                    object-fit:cover;
+                    background:#eee;
+                  "
+                >
+              `
+              : `
+                <div
+                  style="
+                    width:100px;
+                    height:100px;
+                    border-radius:50%;
+                    background:var(--blue);
+                    color:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:40px;
+                    font-weight:bold;
+                  "
+                >
+                  ${escapeHTML(
+                    (user.displayName || "?")
+                      .charAt(0)
+                      .toUpperCase()
+                  )}
+                </div>
+              `
+          }
+
+
+          <!-- NAME -->
+
+          <h2 style="margin:15px 0 5px">
+
+            ${escapeHTML(
+              user.displayName || "Unnamed"
+            )}
+
+          </h2>
+
+
+          <!-- BIO -->
+
+          ${
+            user.bio
+              ? `
+                <p
+                  style="
+                    color:var(--muted);
+                    max-width:500px;
+                    margin:5px 0 15px;
+                  "
+                >
+                  ${escapeHTML(user.bio)}
+                </p>
+              `
+              : ""
+          }
+
+
+          <!-- STATS -->
+
+          <div
+            style="
+              display:flex;
+              gap:40px;
+              margin:15px 0;
+            "
+          >
+
+            <!-- FOLLOWERS COUNT ONLY -->
+
+            <div>
+
+              <strong
+                style="
+                  display:block;
+                  font-size:20px;
+                "
+              >
+                ${followers.length}
+              </strong>
+
+              <span
+                style="
+                  color:var(--muted);
+                  font-size:14px;
+                "
+              >
+                Followers
+              </span>
+
+            </div>
+
+
+            <!-- FOLLOWING BUTTON -->
+
+            <button
+              id="followingBtn"
+              style="
+                border:none;
+                background:none;
+                cursor:pointer;
+                text-align:center;
+                font-family:inherit;
+              "
+            >
+
+              <strong
+                style="
+                  display:block;
+                  font-size:20px;
+                "
+              >
+                ${following.length}
+              </strong>
+
+              <span
+                style="
+                  color:var(--muted);
+                  font-size:14px;
+                "
+              >
+                Following
+              </span>
+
+            </button>
+
+          </div>
+
+
+          <!-- ACTION BUTTON -->
+
+          ${
+            isOwnProfile
+
+              ? `
+
+                <button
+                  id="editProfileBtn"
+                  class="btn-ghost"
+                  style="margin-top:10px"
+                >
+                  Edit Profile
+                </button>
+
+              `
+
+              : currentUser
+
+                ? `
+
+                  <button
+                    id="followBtn"
+                    class="btn"
+                    style="margin-top:10px"
+                  >
+
+                    ${
+                      isFollowing
+                        ? "Following ✓"
+                        : "Follow"
+                    }
+
+                  </button>
+
+                `
+
+                : `
+
+                  <button
+                    id="followBtn"
+                    class="btn"
+                    style="margin-top:10px"
+                  >
+                    Sign in to Follow
+                  </button>
+
+                `
+
+          }
+
+        </div>
+
+
+        <!-- UPLOADS -->
+
+        <div style="margin-top:25px">
+
+          <h2>
+            ${
+              isOwnProfile
+                ? "Your Uploads"
+                : "Uploads"
+            }
+          </h2>
+
+
+          <div
+            id="profileUploads"
+            class="list"
+          >
+
+            ${
+              uploads.length === 0
+
+                ? `
+
+                  <p
+                    style="
+                      color:var(--muted);
+                      padding:20px 0;
+                    "
+                  >
+                    No uploads yet.
+                  </p>
+
+                `
+
+                : ""
+
+            }
+
+          </div>
+
+        </div>
+
       </div>
+
     `;
-    card.querySelector('.title').addEventListener('click', () => loadVideoPage(d.id));
-    userVideosDiv.appendChild(card);
-  });
+
+
+    /* =============================
+       FOLLOWING PAGE BUTTON
+    ============================= */
+
+    const followingBtn =
+      document.getElementById("followingBtn");
+
+    if (followingBtn) {
+
+      followingBtn.addEventListener(
+        "click",
+        () => {
+
+          loadFollowingPage(userId);
+
+        }
+      );
+
+    }
+
+
+    /* =============================
+       FOLLOW / UNFOLLOW
+    ============================= */
+
+    const followBtn =
+      document.getElementById("followBtn");
+
+    if (followBtn) {
+
+      followBtn.addEventListener(
+        "click",
+        async () => {
+
+          if (!currentUser) {
+
+            alert("Sign in to follow");
+            return;
+
+          }
+
+          if (currentUser.uid === userId) {
+            return;
+          }
+
+
+          followBtn.disabled = true;
+
+
+          try {
+
+            const otherUserRef =
+              doc(db, "users", userId);
+
+            const myUserRef =
+              doc(
+                db,
+                "users",
+                currentUser.uid
+              );
+
+
+            if (isFollowing) {
+
+              /* UNFOLLOW */
+
+              await updateDoc(
+                otherUserRef,
+                {
+                  followers:
+                    arrayRemove(currentUser.uid)
+                }
+              );
+
+              await updateDoc(
+                myUserRef,
+                {
+                  following:
+                    arrayRemove(userId)
+                }
+              );
+
+
+            } else {
+
+              /* FOLLOW */
+
+              await updateDoc(
+                otherUserRef,
+                {
+                  followers:
+                    arrayUnion(currentUser.uid)
+                }
+              );
+
+              await updateDoc(
+                myUserRef,
+                {
+                  following:
+                    arrayUnion(userId)
+                }
+              );
+
+            }
+
+
+            // Reload profile with fresh data
+
+            await loadUserPage(userId);
+
+
+          } catch (err) {
+
+            console.error(err);
+
+            alert(
+              "Follow action failed: " +
+              err.message
+            );
+
+            followBtn.disabled = false;
+
+          }
+
+        }
+      );
+
+    }
+
+
+    /* =============================
+       EDIT PROFILE
+       (we build this next)
+    ============================= */
+
+    const editProfileBtn =
+      document.getElementById(
+        "editProfileBtn"
+      );
+
+    if (editProfileBtn) {
+
+      editProfileBtn.addEventListener(
+        "click",
+        () => {
+
+          alert(
+            "Edit Profile is coming next!"
+          );
+
+        }
+      );
+
+    }
+
+
+    /* =============================
+       RENDER UPLOADS
+    ============================= */
+
+    const uploadsContainer =
+      document.getElementById(
+        "profileUploads"
+      );
+
+
+    uploads.forEach(v => {
+
+      const card =
+        document.createElement("div");
+
+      card.className =
+        "video-card";
+
+
+      /* Thumbnail */
+
+      const thumbnail =
+        v.thumbnailUrl ||
+        "https://placehold.co/320x180/111/FFF?text=Upload";
+
+
+      /* Detect content */
+
+      let typeLabel = "";
+
+      if (v.videoUrl && v.modelUrl) {
+
+        typeLabel = "🎬 Video + 🎨 3D";
+
+      } else if (v.videoUrl) {
+
+        typeLabel = "🎬 Video";
+
+      } else if (v.modelUrl) {
+
+        typeLabel = "🎨 3D Model";
+
+      }
+
+
+      card.innerHTML = `
+
+        <div class="thumb">
+
+          <img
+            src="${escapeHTML(thumbnail)}"
+            alt="${escapeHTML(v.title)}"
+          >
+
+        </div>
+
+
+        <div class="meta">
+
+          <h3 class="title">
+
+            ${escapeHTML(v.title)}
+
+          </h3>
+
+
+          <p class="desc">
+
+            ${escapeHTML(
+              v.description || ""
+            )}
+
+          </p>
+
+
+          <p class="small">
+
+            ${typeLabel}
+
+          </p>
+
+        </div>
+
+      `;
+
+
+      card.addEventListener(
+        "click",
+        () => {
+
+          loadVideoPage(v.id);
+
+        }
+      );
+
+
+      uploadsContainer.appendChild(card);
+
+    });
+
+
+  } catch (err) {
+
+    console.error(
+      "Profile load error:",
+      err
+    );
+
+
+    contentArea.innerHTML = `
+
+      <div style="padding:20px">
+
+        <h3>
+          Failed to load profile
+        </h3>
+
+        <p style="color:#888">
+
+          ${escapeHTML(err.message)}
+
+        </p>
+
+      </div>
+
+    `;
+
+  }
+
 }
 
 /* ---------- Video page (video + optional inline 3D viewer) ---------- */
