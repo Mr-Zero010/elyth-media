@@ -335,7 +335,7 @@ onAuthStateChanged(auth, async (user) => {
     const userDoc = {
       displayName: user.displayName || 'Unnamed',
       photoURL: user.photoURL || '',
-      about: snap.exists() ? (snap.data().about || "") : "",
+      About: snap.exists() ? (snap.data().about || "") : "",
       followers: snap.exists() ? (snap.data().followers || []) : [],
       following: snap.exists() ? (snap.data().following || []) : [],
       joinedAt: snap.exists() ? snap.data().joinedAt || serverTimestamp() : serverTimestamp()
