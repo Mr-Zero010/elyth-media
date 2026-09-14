@@ -335,6 +335,7 @@ onAuthStateChanged(auth, async (user) => {
     const userDoc = {
       displayName: user.displayName || 'Unnamed',
       photoURL: user.photoURL || '',
+      about: snap.exists() ? (snap.data().about || "") : "",
       followers: snap.exists() ? (snap.data().followers || []) : [],
       following: snap.exists() ? (snap.data().following || []) : [],
       joinedAt: snap.exists() ? snap.data().joinedAt || serverTimestamp() : serverTimestamp()
@@ -1383,10 +1384,10 @@ async function loadUserPage(userId) {
           </h2>
 
 
-          <!-- BIO -->
+          <!-- ABOUT-->
 
           ${
-            user.bio
+            user.About
               ? `
                 <p
                   style="
@@ -1395,7 +1396,7 @@ async function loadUserPage(userId) {
                     margin:5px 0 15px;
                   "
                 >
-                  ${escapeHTML(user.bio)}
+                  ${escapeHTML(user.About)}
                 </p>
               `
               : ""
@@ -1714,21 +1715,49 @@ async function loadUserPage(userId) {
         "editProfileBtn"
       );
 
-    if (editProfileBtn) {
-
       editProfileBtn.addEventListener(
-        "click",
-        () => {
+  "click",
+  async () => {
 
-          alert(
-            "Edit Profile is coming next!"
-          );
+    const currentAbout = user.about || "";
 
+    const newAbout = prompt(
+      "About",
+      currentAbout
+    );
+
+    // User pressed Cancel
+    if (newAbout === null) {
+      return;
+    }
+
+    try {
+
+      await updateDoc(
+        doc(db, "users", currentUser.uid),
+        {
+          about: newAbout.trim()
         }
+      );
+
+      // Reload profile so the new About appears
+      await loadUserPage(currentUser.uid);
+
+    } catch (error) {
+
+      console.error(
+        "Error updating About:",
+        error
+      );
+
+      alert(
+        "Failed to update About. Please try again."
       );
 
     }
 
+  }
+);
 
     /* =============================
        RENDER UPLOADS
