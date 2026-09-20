@@ -81,6 +81,48 @@ button{cursor:pointer}
 .user-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .user-header img{width:80px;height:80px;border-radius:50%}
 .follow-count{color:var(--muted);font-size:14px;margin-left:8px}
+/* ================================
+   PROFILE TABS
+================================ */
+
+.profile-tabs{
+  display:flex;
+  justify-content:center;
+  gap:35px;
+  margin-top:25px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+.profile-tab{
+  background:none;
+  border:none;
+  padding:12px 5px;
+  font-family:inherit;
+  font-size:16px;
+  font-weight:600;
+  color:var(--muted);
+  cursor:pointer;
+  position:relative;
+}
+
+.profile-tab.active{
+  color:#111;
+}
+
+.profile-tab.active::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-1px;
+  height:3px;
+  background:var(--blue);
+  border-radius:3px 3px 0 0;
+}
+
+.profile-tab:hover{
+  color:#111;
+}
 
 /* VIDEO PAGE LAYOUT */
 .video-page{padding:12px;max-width:100%}
@@ -1239,7 +1281,6 @@ async function loadUserPage(userId) {
     } catch (e) {
       console.warn(e);
     }
-
     __threeInstance = null;
   }
 
@@ -1248,8 +1289,7 @@ async function loadUserPage(userId) {
       <p style="color:#888;">Loading profile...</p>
     </div>
   `;
-
-  try {
+  }
 
     /* =============================
        GET USER DATA
@@ -1266,7 +1306,6 @@ async function loadUserPage(userId) {
         </div>
       `;
 
-      return;
     }
 
     const user = userSnap.data();
@@ -1528,18 +1567,40 @@ async function loadUserPage(userId) {
         </div>
 
 
-        <!-- UPLOADS -->
+        /* =============================
+   PROFILE CONTENT
+============================= */
 
-        <div style="margin-top:25px">
+<div style="margin-top:25px">
 
-          <h2>
-            ${
-              isOwnProfile
-                ? "Your Uploads"
-                : "Uploads"
-            }
-          </h2>
+  ${
+    isOwnProfile
+      ? `
 
+        <!-- PROFILE TABS -->
+
+        <div class="profile-tabs">
+
+          <button
+            id="uploadsTab"
+            class="profile-tab active"
+          >
+            Your Uploads
+          </button>
+
+          <button
+            id="followingTab"
+            class="profile-tab"
+          >
+            Your Followings
+          </button>
+
+        </div>
+
+
+        <!-- TAB CONTENT -->
+
+        <div id="profileTabContent">
 
           <div
             id="profileUploads"
@@ -1548,9 +1609,7 @@ async function loadUserPage(userId) {
 
             ${
               uploads.length === 0
-
                 ? `
-
                   <p
                     style="
                       color:var(--muted);
@@ -1559,42 +1618,45 @@ async function loadUserPage(userId) {
                   >
                     No uploads yet.
                   </p>
-
                 `
-
                 : ""
-
             }
 
           </div>
+        </div>
+
+      `
+      : `
+        <!-- OTHER USER'S PROFILE -->
+
+        <h2>Uploads</h2>
+
+        <div
+          id="profileUploads"
+          class="list"
+        >
+          ${
+            uploads.length === 0
+              ? `
+                <p
+                  style="
+                    color:var(--muted);
+                    padding:20px 0;
+                  "
+                >
+                  No uploads yet.
+                </p>
+              `
+              : ""
+          }
 
         </div>
 
-      </div>
+      `
+   }
+    </div>
 
     `;
-
-
-    /* =============================
-       FOLLOWING PAGE BUTTON
-    ============================= */
-
-    const followingBtn =
-      document.getElementById("followingBtn");
-
-    if (followingBtn) {
-
-      followingBtn.addEventListener(
-        "click",
-        () => {
-
-          loadFollowingPage(userId);
-
-        }
-      );
-
-    }
-
 
     /* =============================
        FOLLOW / UNFOLLOW
@@ -1769,136 +1831,410 @@ if (editProfileBtn) {
 
 }
 
-    /* =============================
-       RENDER UPLOADS
-    ============================= */
+/* =============================
+   PROFILE TABS
+============================= */
 
-    const uploadsContainer =
-      document.getElementById(
-        "profileUploads"
-      );
+if (isOwnProfile) {
 
+  const uploadsTab =
+    document.getElementById("uploadsTab");
 
-    uploads.forEach(v => {
+  const followingTab =
+    document.getElementById("followingTab");
 
-      const card =
-        document.createElement("div");
-
-      card.className =
-        "video-card";
+  const profileTabContent =
+    document.getElementById("profileTabContent");
 
 
-      /* Thumbnail */
+  /* YOUR UPLOADS TAB */
 
-      const thumbnail =
-        v.thumbnailUrl ||
-        "https://placehold.co/320x180/111/FFF?text=Upload";
+  if (uploadsTab) {
 
+    uploadsTab.addEventListener("click", () => {
 
-      /* Detect content */
+      uploadsTab.classList.add("active");
+      followingTab.classList.remove("active");
 
-      let typeLabel = "";
+      profileTabContent.innerHTML = `
+        <div
+          id="profileUploads"
+          class="list"
+        >
 
-      if (v.videoUrl && v.modelUrl) {
-
-        typeLabel = "🎬 Video + 🎨 3D";
-
-      } else if (v.videoUrl) {
-
-        typeLabel = "🎬 Video";
-
-      } else if (v.modelUrl) {
-
-        typeLabel = "🎨 3D Model";
-
-      }
-
-
-      card.innerHTML = `
-
-        <div class="thumb">
-
-          <img
-            src="${escapeHTML(thumbnail)}"
-            alt="${escapeHTML(v.title)}"
-          >
+          ${
+            uploads.length === 0
+              ? `
+                <p
+                  style="
+                    color:var(--muted);
+                    padding:20px 0;
+                  "
+                >
+                  No uploads yet.
+                </p>
+              `
+              : ""
+          }
 
         </div>
-
-
-        <div class="meta">
-
-          <h3 class="title">
-
-            ${escapeHTML(v.title)}
-
-          </h3>
-
-
-          <p class="desc">
-
-            ${escapeHTML(
-              v.description || ""
-            )}
-
-          </p>
-
-
-          <p class="small">
-
-            ${typeLabel}
-
-          </p>
-
-        </div>
-
       `;
 
 
-      card.addEventListener(
-        "click",
-        () => {
-
-          loadVideoPage(v.id);
-
-        }
-      );
-
-
-      uploadsContainer.appendChild(card);
+      renderProfileUploads(uploads);
 
     });
 
+  }
 
-  } catch (err) {
 
-    console.error(
-      "Profile load error:",
-      err
+  /* YOUR FOLLOWINGS TAB */
+
+  if (followingTab) {
+
+    followingTab.addEventListener("click", async () => {
+
+      uploadsTab.classList.remove("active");
+      followingTab.classList.add("active");
+
+      profileTabContent.innerHTML = `
+        <div
+          style="
+            padding:20px 0;
+            color:var(--muted);
+          "
+        >
+          Loading channels...
+        </div>
+      `;
+
+
+      try {
+
+        const followingIds =
+          user.following || [];
+
+
+        if (followingIds.length === 0) {
+
+          profileTabContent.innerHTML = `
+            <p
+              style="
+                color:var(--muted);
+                padding:20px 0;
+              "
+            >
+              You are not following any channels yet.
+            </p>
+          `;
+
+          return;
+        }
+
+
+        const followingUsers =
+          await Promise.all(
+            followingIds.map(async (followingId) => {
+
+              const userSnap =
+                await getDoc(
+                  doc(
+                    db,
+                    "users",
+                    followingId
+                  )
+                );
+
+              if (!userSnap.exists()) {
+                return null;
+              }
+
+              return {
+                id: followingId,
+                ...userSnap.data()
+              };
+
+            })
+          );
+
+
+        const validUsers =
+          followingUsers.filter(Boolean);
+
+
+        if (validUsers.length === 0) {
+
+          profileTabContent.innerHTML = `
+            <p
+              style="
+                color:var(--muted);
+                padding:20px 0;
+              "
+            >
+              No channels found.
+            </p>
+          `;
+
+          return;
+        }
+
+
+        profileTabContent.innerHTML = `
+          <div
+            id="followingChannels"
+            class="list"
+          ></div>
+        `;
+
+
+        const followingChannels =
+          document.getElementById(
+            "followingChannels"
+          );
+
+
+        validUsers.forEach(channel => {
+
+          const card =
+            document.createElement("div");
+
+          card.className = "video-card";
+
+          card.style.cursor = "pointer";
+
+
+          const initial =
+            (channel.displayName || "?")
+              .charAt(0)
+              .toUpperCase();
+
+
+          card.innerHTML = `
+
+            ${
+              channel.photoURL
+                ? `
+                  <img
+                    src="${escapeHTML(channel.photoURL)}"
+                    style="
+                      width:70px;
+                      height:70px;
+                      border-radius:50%;
+                      object-fit:cover;
+                      flex-shrink:0;
+                    "
+                  >
+                `
+                : `
+                  <div
+                    style="
+                      width:70px;
+                      height:70px;
+                      border-radius:50%;
+                      background:var(--blue);
+                      color:white;
+                      display:flex;
+                      align-items:center;
+                      justify-content:center;
+                      font-size:28px;
+                      font-weight:bold;
+                      flex-shrink:0;
+                    "
+                  >
+                    ${escapeHTML(initial)}
+                  </div>
+                `
+            }
+
+            <div class="meta">
+
+              <h3 class="title">
+                ${escapeHTML(
+                  channel.displayName || "Unnamed"
+                )}
+              </h3>
+
+              <p class="desc">
+                ${channel.followers?.length || 0}
+                Followers
+                ·
+                ${channel.following?.length || 0}
+                Following
+              </p>
+
+            </div>
+
+          `;
+
+
+          card.addEventListener(
+            "click",
+            () => {
+
+              loadUserPage(channel.id);
+
+            }
+          );
+
+
+          followingChannels.appendChild(card);
+
+        });
+
+
+      } catch (error) {
+
+        console.error(
+          "Failed to load following channels:",
+          error
+        );
+
+        profileTabContent.innerHTML = `
+          <p
+            style="
+              color:#888;
+              padding:20px 0;
+            "
+          >
+            Failed to load channels.
+          </p>
+        `;
+
+      }
+
+    });
+
+  }
+
+}
+
+ /* =============================
+   RENDER UPLOADS
+============================= */
+
+function renderProfileUploads(uploads) {
+
+  const uploadsContainer =
+    document.getElementById(
+      "profileUploads"
     );
 
 
-    contentArea.innerHTML = `
+  if (!uploadsContainer) {
+    return;
+  }
 
-      <div style="padding:20px">
 
-        <h3>
-          Failed to load profile
+  uploadsContainer.innerHTML = "";
+
+
+  if (uploads.length === 0) {
+
+    uploadsContainer.innerHTML = `
+      <p
+        style="
+          color:var(--muted);
+          padding:20px 0;
+        "
+      >
+        No uploads yet.
+      </p>
+    `;
+
+    return;
+  }
+
+
+  uploads.forEach(v => {
+
+    const card =
+      document.createElement("div");
+
+    card.className =
+      "video-card";
+
+
+    const thumbnail =
+      v.thumbnailUrl ||
+      "https://placehold.co/320x180/111/FFF?text=Upload";
+
+
+    let typeLabel = "";
+
+
+    if (v.videoUrl && v.modelUrl) {
+
+      typeLabel =
+        "🎬 Video + 🎨 3D";
+
+    } else if (v.videoUrl) {
+
+      typeLabel =
+        "🎬 Video";
+
+    } else if (v.modelUrl) {
+
+      typeLabel =
+        "🎨 3D Model";
+
+    }
+
+
+    card.innerHTML = `
+
+      <div class="thumb">
+
+        <img
+          src="${escapeHTML(thumbnail)}"
+          alt="${escapeHTML(v.title)}"
+        >
+
+      </div>
+
+
+      <div class="meta">
+
+        <h3 class="title">
+          ${escapeHTML(v.title)}
         </h3>
 
-        <p style="color:#888">
 
-          ${escapeHTML(err.message)}
+        <p class="desc">
+          ${escapeHTML(
+            v.description || ""
+          )}
+        </p>
 
+
+        <p class="small">
+          ${typeLabel}
         </p>
 
       </div>
 
     `;
 
-  }
+
+    card.addEventListener(
+      "click",
+      () => {
+
+        loadVideoPage(v.id);
+
+      }
+    );
+    
+
+    uploadsContainer.appendChild(card);
+
+  });
 
 }
+/* =============================
+   INITIAL UPLOAD RENDER
+============================= */
+
+renderProfileUploads(uploads);
 
 /* ---------- Video page (video + optional inline 3D viewer) ---------- */
 async function loadVideoPage(videoId) {
