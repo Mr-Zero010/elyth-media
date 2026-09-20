@@ -1295,10 +1295,10 @@ async function loadUserPage(userId) {
     /* =============================
        GET USER DATA
     ============================= */
-
+  {
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
-
+  }
     if (!userSnap.exists()) {
 
       contentArea.innerHTML = `
