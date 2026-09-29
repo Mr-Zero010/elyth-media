@@ -1,4 +1,4 @@
-<!doctype html>
+
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -1438,38 +1438,31 @@ async function loadUserPage(userId) {
             </div>
 
 
-            <!-- FOLLOWING BUTTON -->
+              ${
+              !isOwnProfile
+                ? `
+                  <div>
+                    <strong
+                      style="
+                        display:block;
+                        font-size:20px;
+                      "
+                    >
+                      ${following.length}
+                    </strong>
 
-            <button
-              id="followingBtn"
-              style="
-                border:none;
-                background:none;
-                cursor:pointer;
-                text-align:center;
-                font-family:inherit;
-              "
-            >
-
-              <strong
-                style="
-                  display:block;
-                  font-size:20px;
-                "
-              >
-                ${following.length}
-              </strong>
-
-              <span
-                style="
-                  color:var(--muted);
-                  font-size:14px;
-                "
-              >
-                Following
-              </span>
-
-            </button>
+                    <span
+                      style="
+                        color:var(--muted);
+                        font-size:14px;
+                      "
+                    >
+                      Following
+                    </span>
+                  </div>
+                `
+                : ""
+            }
 
           </div>
 
@@ -1528,45 +1521,92 @@ async function loadUserPage(userId) {
         </div>
 
 
-        <!-- UPLOADS -->
+        <!-- PROFILE CONTENT TABS -->
 
         <div style="margin-top:25px">
 
-          <h2>
-            ${
-              isOwnProfile
-                ? "Your Uploads"
-                : "Uploads"
-            }
-          </h2>
+          ${
+            isOwnProfile
+              ? `
+                <div
+                  id="profileTabs"
+                  style="
+                    display:flex;
+                    border-bottom:1px solid #e5e7eb;
+                    margin-bottom:18px;
+                  "
+                >
 
+                  <button
+                    id="uploadsTab"
+                    style="
+                      flex:1;
+                      border:none;
+                      background:none;
+                      cursor:pointer;
+                      padding:12px 10px;
+                      font:inherit;
+                      font-weight:700;
+                      color:#111;
+                      position:relative;
+                    "
+                  >
+                    Your Uploads
+                    <span
+                      id="uploadsTabUnderline"
+                      style="
+                        position:absolute;
+                        left:12%;
+                        right:12%;
+                        bottom:-1px;
+                        height:3px;
+                        background:var(--blue);
+                        border-radius:3px 3px 0 0;
+                      "
+                    ></span>
+                  </button>
+
+                  <button
+                    id="followingTab"
+                    style="
+                      flex:1;
+                      border:none;
+                      background:none;
+                      cursor:pointer;
+                      padding:12px 10px;
+                      font:inherit;
+                      font-weight:700;
+                      color:var(--muted);
+                      position:relative;
+                    "
+                  >
+                    Following
+                    <span
+                      id="followingTabUnderline"
+                      style="
+                        display:none;
+                        position:absolute;
+                        left:12%;
+                        right:12%;
+                        bottom:-1px;
+                        height:3px;
+                        background:var(--blue);
+                        border-radius:3px 3px 0 0;
+                      "
+                    ></span>
+                  </button>
+
+                </div>
+              `
+              : `
+                <h2>Uploads</h2>
+              `
+          }
 
           <div
             id="profileUploads"
             class="list"
-          >
-
-            ${
-              uploads.length === 0
-
-                ? `
-
-                  <p
-                    style="
-                      color:var(--muted);
-                      padding:20px 0;
-                    "
-                  >
-                    No uploads yet.
-                  </p>
-
-                `
-
-                : ""
-
-            }
-
-          </div>
+          ></div>
 
         </div>
 
@@ -1576,23 +1616,235 @@ async function loadUserPage(userId) {
 
 
     /* =============================
-       FOLLOWING PAGE BUTTON
+       PROFILE TABS
     ============================= */
 
-    const followingBtn =
-      document.getElementById("followingBtn");
+    const uploadsTab =
+      document.getElementById("uploadsTab");
 
-    if (followingBtn) {
+    const followingTab =
+      document.getElementById("followingTab");
 
-      followingBtn.addEventListener(
-        "click",
-        () => {
+    const uploadsUnderline =
+      document.getElementById("uploadsTabUnderline");
 
-          loadFollowingPage(userId);
+    const followingUnderline =
+      document.getElementById("followingTabUnderline");
 
+    const uploadsContainer =
+      document.getElementById("profileUploads");
+
+    function renderUploads() {
+
+      uploadsContainer.innerHTML = "";
+
+      if (uploads.length === 0) {
+        uploadsContainer.innerHTML = `
+          <p
+            style="
+              color:var(--muted);
+              padding:20px 0;
+            "
+          >
+            No uploads yet.
+          </p>
+        `;
+        return;
+      }
+
+      uploads.forEach(v => {
+
+        const card = document.createElement("div");
+        card.className = "video-card";
+
+        const thumbnail =
+          v.thumbnailUrl ||
+          "https://placehold.co/320x180/111/FFF?text=Upload";
+
+        let typeLabel = "";
+
+        if (v.videoUrl && v.modelUrl) {
+          typeLabel = "🎬 Video + 🎨 3D";
+        } else if (v.videoUrl) {
+          typeLabel = "🎬 Video";
+        } else if (v.modelUrl) {
+          typeLabel = "🎨 3D Model";
         }
-      );
 
+        card.innerHTML = `
+          <div class="thumb">
+            <img
+              src="${escapeHTML(thumbnail)}"
+              alt="${escapeHTML(v.title)}"
+            >
+          </div>
+
+          <div class="meta">
+            <h3 class="title">
+              ${escapeHTML(v.title)}
+            </h3>
+
+            <p class="desc">
+              ${escapeHTML(v.description || "")}
+            </p>
+
+            <p class="small">
+              ${typeLabel}
+            </p>
+          </div>
+        `;
+
+        card.addEventListener("click", () => {
+          loadVideoPage(v.id);
+        });
+
+        uploadsContainer.appendChild(card);
+      });
+    }
+
+    async function renderFollowing() {
+
+      uploadsContainer.innerHTML = `
+        <p style="color:var(--muted);padding:20px 0;">
+          Loading following...
+        </p>
+      `;
+
+      try {
+
+        if (following.length === 0) {
+          uploadsContainer.innerHTML = `
+            <p style="color:var(--muted);padding:20px 0;">
+              You're not following anyone yet.
+            </p>
+          `;
+          return;
+        }
+
+        uploadsContainer.innerHTML = "";
+
+        for (const followedUserId of following) {
+
+          const followedUserSnap = await getDoc(
+            doc(db, "users", followedUserId)
+          );
+
+          if (!followedUserSnap.exists()) continue;
+
+          const followedUser = followedUserSnap.data();
+          const displayName = followedUser.displayName || "Unnamed";
+          const photo = followedUser.photoURL || "";
+
+          const card = document.createElement("div");
+
+          card.style.cssText = `
+            display:flex;
+            align-items:center;
+            gap:14px;
+            padding:14px;
+            margin-bottom:12px;
+            background:white;
+            border-radius:12px;
+            box-shadow:var(--shadow);
+            cursor:pointer;
+          `;
+
+          card.innerHTML = `
+            ${
+              photo
+                ? `
+                  <img
+                    src="${escapeHTML(photo)}"
+                    alt="${escapeHTML(displayName)}"
+                    style="
+                      width:60px;
+                      height:60px;
+                      border-radius:50%;
+                      object-fit:cover;
+                      background:#eee;
+                      flex-shrink:0;
+                    "
+                  >
+                `
+                : `
+                  <div
+                    style="
+                      width:60px;
+                      height:60px;
+                      border-radius:50%;
+                      background:var(--blue);
+                      color:white;
+                      display:flex;
+                      align-items:center;
+                      justify-content:center;
+                      font-size:24px;
+                      font-weight:bold;
+                      flex-shrink:0;
+                    "
+                  >
+                    ${escapeHTML(displayName.charAt(0).toUpperCase())}
+                  </div>
+                `
+            }
+
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:17px;margin-bottom:4px;">
+                ${escapeHTML(displayName)}
+              </div>
+
+              <div style="color:var(--muted);font-size:14px;">
+                ${(followedUser.followers || []).length} Followers
+              </div>
+            </div>
+
+            <div style="color:var(--muted);font-size:22px;">›</div>
+          `;
+
+          card.addEventListener("click", () => {
+            loadUserPage(followedUserId);
+          });
+
+          uploadsContainer.appendChild(card);
+        }
+
+        if (uploadsContainer.children.length === 0) {
+          uploadsContainer.innerHTML = `
+            <p style="color:var(--muted);padding:20px 0;">
+              No followed accounts found.
+            </p>
+          `;
+        }
+
+      } catch (err) {
+        console.error("Following list error:", err);
+
+        uploadsContainer.innerHTML = `
+          <p style="color:#ef4444;padding:20px 0;">
+            Failed to load following list: ${escapeHTML(err.message)}
+          </p>
+        `;
+      }
+    }
+
+    renderUploads();
+
+    if (uploadsTab && followingTab) {
+
+      uploadsTab.addEventListener("click", () => {
+        uploadsTab.style.color = "#111";
+        followingTab.style.color = "var(--muted)";
+        uploadsUnderline.style.display = "block";
+        followingUnderline.style.display = "none";
+        renderUploads();
+      });
+
+      followingTab.addEventListener("click", async () => {
+        uploadsTab.style.color = "var(--muted)";
+        followingTab.style.color = "#111";
+        uploadsUnderline.style.display = "none";
+        followingUnderline.style.display = "block";
+        await renderFollowing();
+      });
     }
 
 
@@ -1769,105 +2021,6 @@ if (editProfileBtn) {
 
 }
 
-    /* =============================
-       RENDER UPLOADS
-    ============================= */
-
-    const uploadsContainer =
-      document.getElementById(
-        "profileUploads"
-      );
-
-
-    uploads.forEach(v => {
-
-      const card =
-        document.createElement("div");
-
-      card.className =
-        "video-card";
-
-
-      /* Thumbnail */
-
-      const thumbnail =
-        v.thumbnailUrl ||
-        "https://placehold.co/320x180/111/FFF?text=Upload";
-
-
-      /* Detect content */
-
-      let typeLabel = "";
-
-      if (v.videoUrl && v.modelUrl) {
-
-        typeLabel = "🎬 Video + 🎨 3D";
-
-      } else if (v.videoUrl) {
-
-        typeLabel = "🎬 Video";
-
-      } else if (v.modelUrl) {
-
-        typeLabel = "🎨 3D Model";
-
-      }
-
-
-      card.innerHTML = `
-
-        <div class="thumb">
-
-          <img
-            src="${escapeHTML(thumbnail)}"
-            alt="${escapeHTML(v.title)}"
-          >
-
-        </div>
-
-
-        <div class="meta">
-
-          <h3 class="title">
-
-            ${escapeHTML(v.title)}
-
-          </h3>
-
-
-          <p class="desc">
-
-            ${escapeHTML(
-              v.description || ""
-            )}
-
-          </p>
-
-
-          <p class="small">
-
-            ${typeLabel}
-
-          </p>
-
-        </div>
-
-      `;
-
-
-      card.addEventListener(
-        "click",
-        () => {
-
-          loadVideoPage(v.id);
-
-        }
-      );
-
-
-      uploadsContainer.appendChild(card);
-
-    });
 
 
   } catch (err) {
