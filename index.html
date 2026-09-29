@@ -1,4 +1,4 @@
-
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -232,6 +232,8 @@ button{cursor:pointer}
 <div id="uploadPanel">
   <input id="uploadTitle" type="text" placeholder="Title (video or model)" />
   <textarea id="uploadDescription" placeholder="Description" rows="2"></textarea>
+  <input id="uploadKeywords" type="text" placeholder="Keywords (comma separated, e.g. biology, cells, 3D)" />
+  <small style="color:#888;display:block;margin:4px 0 10px;">Add keywords to help people find your content.</small>
   <input id="uploadVideo" type="file" accept="video/*" />
   <input id="uploadModel" type="file" accept=".glb,.gltf" />
   <button id="uploadSubmit" class="btn">Upload</button>
@@ -299,6 +301,7 @@ const navProfile = document.getElementById('navProfile');
 const uploadPanel = document.getElementById('uploadPanel');
 const uploadTitle = document.getElementById('uploadTitle');
 const uploadDescription = document.getElementById('uploadDescription');
+const uploadKeywords = document.getElementById('uploadKeywords');
 const uploadVideo = document.getElementById('uploadVideo');
 const uploadModel = document.getElementById('uploadModel');
 const uploadSubmit = document.getElementById('uploadSubmit');
@@ -361,6 +364,7 @@ function renderVideos(videos) {
   videos.forEach(v => {
     const card = document.createElement('div');
     card.className = 'video-card';
+    card.__videoData = v;
     card.innerHTML = `
       <div class="thumb"><img src="${v.thumbnailUrl || 'https://placehold.co/320x180/111/FFF?text=3D+Model'}" alt="${escapeHTML(v.title)}"></div>
       <div class="meta">
@@ -389,14 +393,44 @@ onSnapshot(videosQuery, snap => {
   renderVideos(videos);
 });
 
+function normalizeKeywords(value) {
+  return String(value || '')
+    .toLowerCase()
+    .split(',')
+    .map(k => k.trim())
+    .filter(Boolean)
+    .map(k => k.replace(/\s+/g, ' '))
+    .filter((k, i, arr) => arr.indexOf(k) === i);
+}
+
+function getSearchTerms(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function videoMatchesSearch(v, searchText) {
+  const terms = getSearchTerms(searchText);
+  if (terms.length === 0) return true;
+
+  const searchableText = [
+    v.title || '',
+    v.description || '',
+    ...(Array.isArray(v.keywords) ? v.keywords : [])
+  ].join(' ').toLowerCase();
+
+  return terms.every(term => searchableText.includes(term));
+}
+
 function searchVideos() {
-  const q = searchInput.value.toLowerCase();
+  const q = searchInput.value;
   const cards = Array.from(getVideoList().children);
 
   cards.forEach(c => {
-    const title = (c.querySelector('.title')?.textContent || '').toLowerCase();
-    const desc = (c.querySelector('.desc')?.textContent || '').toLowerCase();
-    c.style.display = (title.includes(q) || desc.includes(q)) ? 'flex' : 'none';
+    const video = c.__videoData;
+    c.style.display = video && videoMatchesSearch(video, q) ? 'flex' : 'none';
   });
 }
 
@@ -1102,6 +1136,7 @@ uploadSubmit.addEventListener('click', async () => {
 
     const title = uploadTitle.value.trim();
     const description = uploadDescription.value.trim();
+    const keywords = normalizeKeywords(uploadKeywords.value);
     const videoFile = uploadVideo.files[0] || null;
     const modelFile = uploadModel.files[0] || null;
 
@@ -1201,6 +1236,7 @@ uploadSubmit.addEventListener('click', async () => {
     await addDoc(collection(db, "videos"), {
       title,
       description,
+      keywords,
       ownerId: currentUser.uid,
       ownerName: currentUser.displayName || "Unknown",
       uploadDate: serverTimestamp(),
@@ -1216,6 +1252,7 @@ uploadSubmit.addEventListener('click', async () => {
     uploadStatus.textContent = "Upload complete";
     uploadTitle.value = "";
     uploadDescription.value = "";
+    uploadKeywords.value = "";
     uploadVideo.value = "";
     uploadModel.value = "";
     uploadPanel.style.display = "none";
