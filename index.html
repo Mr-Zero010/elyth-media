@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -362,6 +363,13 @@ function renderVideos(videos) {
   }
 
   videos.forEach(v => {
+    if (!Array.isArray(v.keywords)) v.keywords = [];
+    if (!v.category || !Array.isArray(v.categories)) {
+      const detected = detectCategories(v.title, v.description, v.keywords);
+      if (!v.category) v.category = detected.category;
+      if (!Array.isArray(v.categories)) v.categories = detected.categories;
+    }
+
     const card = document.createElement('div');
     card.className = 'video-card';
     card.__videoData = v;
@@ -370,7 +378,7 @@ function renderVideos(videos) {
       <div class="meta">
         <h3 class="title">${escapeHTML(v.title)}</h3>
         <p class="desc">${escapeHTML(v.description || '')}</p>
-        <p class="small">By <a href="#" class="video-owner" data-owner="${v.ownerId}">${escapeHTML(v.ownerName || 'Unknown')}</a></p>
+        <p class="small">${escapeHTML(v.category || 'General')} · By <a href="#" class="video-owner" data-owner="${v.ownerId}">${escapeHTML(v.ownerName || 'Unknown')}</a></p>
       </div>
     `;
 
@@ -388,19 +396,69 @@ function renderVideos(videos) {
 const videosCol = collection(db, 'videos');
 const videosQuery = query(videosCol, orderBy('uploadDate', 'desc'));
 
+let allVideos = [];
+
 onSnapshot(videosQuery, snap => {
-  const videos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderVideos(videos);
+  allVideos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  runVideoSearch();
 });
 
 function normalizeKeywords(value) {
-  return String(value || '')
-    .toLowerCase()
-    .split(',')
-    .map(k => k.trim())
-    .filter(Boolean)
-    .map(k => k.replace(/\s+/g, ' '))
-    .filter((k, i, arr) => arr.indexOf(k) === i);
+  return [...new Set(
+    String(value || '')
+      .toLowerCase()
+      .split(',')
+      .map(k => k.trim().replace(/\s+/g, ' '))
+      .filter(Boolean)
+  )];
+}
+
+/*
+  Automatic category detection.
+  The uploader's keywords are strongest, then title + description are used
+  as extra signals. This creates a primary category plus all matching categories.
+*/
+const CATEGORY_RULES = {
+  Biology: ['biology', 'cell', 'cells', 'dna', 'rna', 'genetics', 'anatomy', 'physiology', 'microbiology', 'organism', 'evolution', 'botany', 'zoology'],
+  Chemistry: ['chemistry', 'chemical', 'atom', 'molecule', 'molecular', 'reaction', 'organic chemistry', 'inorganic', 'periodic table', 'compound'],
+  Physics: ['physics', 'force', 'motion', 'energy', 'gravity', 'quantum', 'relativity', 'electricity', 'magnetism', 'wave', 'mechanics', 'thermodynamics'],
+  Mathematics: ['math', 'mathematics', 'algebra', 'geometry', 'calculus', 'trigonometry', 'statistics', 'probability', 'equation', 'theorem'],
+  "Computer Science": ['computer science', 'programming', 'coding', 'code', 'javascript', 'python', 'html', 'css', 'algorithm', 'software', 'database', 'machine learning', 'ai', 'artificial intelligence'],
+  Engineering: ['engineering', 'mechanical', 'electrical engineering', 'civil engineering', 'electronics', 'robotics', 'cad', 'circuit', 'thermodynamics'],
+  "3D": ['3d', '3d model', 'model', 'blender', 'cad', 'gltf', 'glb', 'sculpting', 'rendering', 'animation'],
+  Space: ['space', 'astronomy', 'astrophysics', 'planet', 'planets', 'star', 'stars', 'galaxy', 'galaxies', 'cosmos', 'universe', 'nasa'],
+  History: ['history', 'historical', 'ancient', 'civilization', 'empire', 'archaeology', 'war', 'culture'],
+  Geography: ['geography', 'geology', 'earth', 'map', 'maps', 'continent', 'climate', 'landform', 'ocean'],
+  Medicine: ['medicine', 'medical', 'health', 'disease', 'diagnosis', 'surgery', 'clinical', 'pharmacy'],
+  Education: ['education', 'tutorial', 'lesson', 'lecture', 'course', 'study', 'learning', 'explained', 'how to']
+};
+
+function detectCategories(title, description, keywords) {
+  const keywordText = (Array.isArray(keywords) ? keywords : []).join(' ').toLowerCase();
+  const titleText = String(title || '').toLowerCase();
+  const descriptionText = String(description || '').toLowerCase();
+  const fullText = `${titleText} ${descriptionText}`;
+
+  const scores = [];
+
+  for (const [category, terms] of Object.entries(CATEGORY_RULES)) {
+    let score = 0;
+
+    for (const term of terms) {
+      if (keywordText.includes(term)) score += 6;
+      if (titleText.includes(term)) score += 4;
+      if (descriptionText.includes(term)) score += 2;
+    }
+
+    if (score > 0) scores.push({ category, score });
+  }
+
+  scores.sort((a, b) => b.score - a.score);
+
+  return {
+    category: scores[0]?.category || 'General',
+    categories: scores.slice(0, 3).map(x => x.category)
+  };
 }
 
 function getSearchTerms(value) {
@@ -411,27 +469,76 @@ function getSearchTerms(value) {
     .filter(Boolean);
 }
 
-function videoMatchesSearch(v, searchText) {
+function scoreVideo(v, searchText) {
   const terms = getSearchTerms(searchText);
-  if (terms.length === 0) return true;
+  if (terms.length === 0) return 0;
 
-  const searchableText = [
-    v.title || '',
-    v.description || '',
-    ...(Array.isArray(v.keywords) ? v.keywords : [])
-  ].join(' ').toLowerCase();
+  const title = String(v.title || '').toLowerCase();
+  const description = String(v.description || '').toLowerCase();
+  const keywords = Array.isArray(v.keywords) ? v.keywords.map(k => String(k).toLowerCase()) : [];
+  const categories = Array.isArray(v.categories) ? v.categories.map(c => String(c).toLowerCase()) : [];
+  const category = String(v.category || '').toLowerCase();
 
-  return terms.every(term => searchableText.includes(term));
+  let score = 0;
+  let matchedTerms = 0;
+
+  for (const term of terms) {
+    let matched = false;
+
+    if (keywords.includes(term)) {
+      score += 100;
+      matched = true;
+    } else if (keywords.some(k => k.includes(term))) {
+      score += 60;
+      matched = true;
+    }
+
+    if (title === term) {
+      score += 120;
+      matched = true;
+    } else if (title.includes(term)) {
+      score += 80;
+      matched = true;
+    }
+
+    if (description.includes(term)) {
+      score += 35;
+      matched = true;
+    }
+
+    if (categories.includes(term) || category === term) {
+      score += 50;
+      matched = true;
+    }
+
+    if (matched) matchedTerms++;
+  }
+
+  if (matchedTerms === terms.length) score += 40;
+  score += matchedTerms * 15;
+
+  return score;
+}
+
+function runVideoSearch() {
+  const q = searchInput.value;
+
+  if (!q.trim()) {
+    renderVideos(allVideos);
+    return;
+  }
+
+  const ranked = allVideos
+    .map(v => ({ video: v, score: scoreVideo(v, q) }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.video);
+
+  renderVideos(ranked);
 }
 
 function searchVideos() {
-  const q = searchInput.value;
-  const cards = Array.from(getVideoList().children);
-
-  cards.forEach(c => {
-    const video = c.__videoData;
-    c.style.display = video && videoMatchesSearch(video, q) ? 'flex' : 'none';
-  });
+  runVideoSearch();
 }
 
 searchBtn.addEventListener('click', searchVideos);
@@ -1137,6 +1244,7 @@ uploadSubmit.addEventListener('click', async () => {
     const title = uploadTitle.value.trim();
     const description = uploadDescription.value.trim();
     const keywords = normalizeKeywords(uploadKeywords.value);
+    const detectedCategories = detectCategories(title, description, keywords);
     const videoFile = uploadVideo.files[0] || null;
     const modelFile = uploadModel.files[0] || null;
 
@@ -1237,6 +1345,8 @@ uploadSubmit.addEventListener('click', async () => {
       title,
       description,
       keywords,
+      category: detectedCategories.category,
+      categories: detectedCategories.categories,
       ownerId: currentUser.uid,
       ownerName: currentUser.displayName || "Unknown",
       uploadDate: serverTimestamp(),
