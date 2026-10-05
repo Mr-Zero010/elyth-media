@@ -236,8 +236,6 @@ button{cursor:pointer}
   <small style="color:#888;display:block;margin:4px 0 10px;">Add keywords to help people find your content.</small>
   <input id="uploadVideo" type="file" accept="video/*" />
   <input id="uploadModel" type="file" accept=".glb,.gltf" />
-  <label for="uploadThumbnail" style="display:block;margin-top:10px;color:#888;">Thumbnail (optional)</label>
-  <input id="uploadThumbnail" type="file" accept="image/jpeg,image/png" />
   <button id="uploadSubmit" class="btn">Upload</button>
   <small id="uploadStatus"></small>
 </div>
@@ -306,7 +304,6 @@ const uploadDescription = document.getElementById('uploadDescription');
 const uploadKeywords = document.getElementById('uploadKeywords');
 const uploadVideo = document.getElementById('uploadVideo');
 const uploadModel = document.getElementById('uploadModel');
-const uploadThumbnail = document.getElementById('uploadThumbnail');
 const uploadSubmit = document.getElementById('uploadSubmit');
 const uploadStatus = document.getElementById('uploadStatus');
 const searchInput = document.getElementById('searchInput');
@@ -1249,7 +1246,6 @@ uploadSubmit.addEventListener('click', async () => {
     const detectedCategories = detectCategories(title, description, keywords);
     const videoFile = uploadVideo.files[0] || null;
     const modelFile = uploadModel.files[0] || null;
-    const thumbnailFile = uploadThumbnail.files[0] || null;
 
     if (!title) {
       alert("Title required");
@@ -1259,17 +1255,6 @@ uploadSubmit.addEventListener('click', async () => {
     if (!videoFile && !modelFile) {
       alert("Upload a video, a 3D model, or both");
       return;
-    }
-
-    if (thumbnailFile) {
-      if (thumbnailFile.type !== "image/jpeg" && thumbnailFile.type !== "image/png") {
-        alert("Thumbnail must be a JPG or PNG image");
-        return;
-      }
-      if (thumbnailFile.size > 10 * 1024 * 1024) {
-        alert("Thumbnail must be 10 MB or smaller");
-        return;
-      }
     }
 
     uploadStatus.textContent = "Uploading...";
@@ -1286,19 +1271,15 @@ uploadSubmit.addEventListener('click', async () => {
 
   uploadStatus.textContent = "Preparing upload...";
 
-  // Use a custom thumbnail when provided. Otherwise generate one from the video.
-  const thumbnailPromise = (!thumbnailFile && videoFile)
-  ? generateThumbnailBlob(videoFile, 320, 180, 0.5).catch(() => null)
-  : Promise.resolve(null);
-
-  if (thumbnailFile) {
-    uploadStatus.textContent = "Uploading custom thumbnail...";
-    const thumb = await uploadToR2(thumbnailFile);
-    thumbnailUrl = thumb.url;
-    thumbnailKey = thumb.key;
-  }
-
-  if (videoFile) {
+  // Start thumbnail generation
+  const thumbnailPromise = videoFile
+  ? generateThumbnailBlob(
+      videoFile,
+      320,
+      180,
+      0.5
+    ).catch(() => null)
+  : Promise.resolve(null);if (videoFile) {
 
   // Start video upload immediately
   const videoUploadPromise = uploadToR2(
@@ -1311,11 +1292,11 @@ uploadSubmit.addEventListener('click', async () => {
     }
   );
 
-  // Wait for automatic thumbnail generation when no custom thumbnail was selected
+  // Wait for thumbnail
   const blob = await thumbnailPromise;
 
-  // Upload generated thumbnail only when no custom thumbnail exists
-  if (!thumbnailFile && blob) {
+  // Upload thumbnail
+  if (blob) {
 
     try {
 
@@ -1383,7 +1364,6 @@ uploadSubmit.addEventListener('click', async () => {
     uploadKeywords.value = "";
     uploadVideo.value = "";
     uploadModel.value = "";
-    uploadThumbnail.value = "";
     uploadPanel.style.display = "none";
 
   } catch (err) {
