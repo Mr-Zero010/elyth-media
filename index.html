@@ -951,7 +951,22 @@ async function uploadToR2(file, progressCallback = null) {
     throw new Error("Not authenticated");
   }
 
-  const token = await user.getIdToken(true);
+  // Avoid leaving the upload screen waiting forever for Firebase Auth.
+  let token;
+  let tokenTimer;
+  try {
+    token = await Promise.race([
+      user.getIdToken(true),
+      new Promise((_, reject) => {
+        tokenTimer = setTimeout(
+          () => reject(new Error("Timed out getting your sign-in token. Check your connection and sign in again.")),
+          30000
+        );
+      })
+    ]);
+  } finally {
+    clearTimeout(tokenTimer);
+  }
 
   const safeName =
     Date.now() +
@@ -986,6 +1001,9 @@ async function uploadToR2(file, progressCallback = null) {
   } catch (err) {
     if (err.name === "AbortError") {
       throw new Error("Starting upload timed out after 2 minutes. Check the Cloudflare Worker.");
+    }
+    if (err instanceof TypeError && /fetch/i.test(err.message)) {
+      throw new Error("Could not reach the upload Worker (fetch failed). This is commonly caused by Worker CORS/preflight settings, a Worker error, or a network block. Check the Worker code and browser Console/Network tab.");
     }
     throw new Error("Could not start upload: " + err.message);
   } finally {
@@ -1271,67 +1289,47 @@ uploadSubmit.addEventListener('click', async () => {
     ? "Starting video upload..."
     : "Starting 3D model upload...";
 
-  // Start thumbnail generation
-  const thumbnailPromise = videoFile
-  ? generateThumbnailBlob(
+  if (videoFile) {
+    // Upload the video first so a thumbnail request cannot make the video
+    // appear stuck or compete with the main upload for bandwidth.
+    uploadStatus.textContent = "Starting video upload...";
+
+    const video = await uploadToR2(
+      videoFile,
+      (percent) => {
+        uploadStatus.textContent = "Uploading video... " + percent + "%";
+      }
+    );
+
+    videoUrl = video.url;
+    videoKey = video.key;
+    videoType = videoFile.type || "video/mp4";
+    uploadStatus.textContent = "Video uploaded. Creating thumbnail...";
+
+    // Thumbnail is optional: failure to create/upload it must not block the video.
+    const blob = await generateThumbnailBlob(
       videoFile,
       320,
       180,
       0.5
-    ).catch(() => null)
-  : Promise.resolve(null);if (videoFile) {
+    ).catch(() => null);
 
-  // Start video upload immediately
-  const videoUploadPromise = uploadToR2(
-    videoFile,
-    (percent) => {
-
-      uploadStatus.textContent =
-        "Uploading video... " + percent + "%";
-
-    }
-  );
-
-  // Wait for thumbnail
-  const blob = await thumbnailPromise;
-
-  // Upload thumbnail
-  if (blob) {
-
-    try {
-
-      const thumbFile = new File(
-        [blob],
-        "thumb_" + Date.now() + ".jpg",
-        { type: "image/jpeg" }
-      );
-
-      const thumb = await uploadToR2(thumbFile);
-
-      thumbnailUrl = thumb.url;
-      thumbnailKey = thumb.key;
-
-    } catch (err) {
-
-      console.warn(
-        "Thumbnail upload failed",
-        err
-      );
-
+    if (blob) {
+      try {
+        uploadStatus.textContent = "Uploading thumbnail...";
+        const thumbFile = new File(
+          [blob],
+          "thumb_" + Date.now() + ".jpg",
+          { type: "image/jpeg" }
+        );
+        const thumb = await uploadToR2(thumbFile);
+        thumbnailUrl = thumb.url;
+        thumbnailKey = thumb.key;
+      } catch (err) {
+        console.warn("Thumbnail upload failed; continuing without thumbnail.", err);
+      }
     }
   }
-
-  // Wait for video upload
-  const video = await videoUploadPromise;
-
-  videoUrl = video.url;
-  videoKey = video.key;
-  videoType = videoFile.type || "video/mp4";
-
-  uploadStatus.textContent =
-    "Video upload complete";
-
-}
 
     if (modelFile) {
       uploadStatus.textContent = "Uploading 3D model...";
