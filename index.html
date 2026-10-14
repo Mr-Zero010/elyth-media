@@ -943,6 +943,47 @@ controls.update();
 };
 }
 
+function uploadMultipartPart({ token, uploadId, key, partNumber, chunk, onProgress }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", R2_UPLOAD_ENDPOINT + "/upload-part", true);
+    xhr.timeout = 15 * 60 * 1000;
+    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.setRequestHeader("x-upload-id", uploadId);
+    xhr.setRequestHeader("x-part-number", String(partNumber));
+    xhr.setRequestHeader("x-key", key);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && typeof onProgress === "function") {
+        onProgress(event.loaded, event.total);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error("Chunk " + partNumber + " failed (HTTP " + xhr.status + "): " + (xhr.responseText || "Upload rejected")));
+        return;
+      }
+      try {
+        const data = JSON.parse(xhr.responseText || "{}");
+        if (!data.etag) {
+          reject(new Error("Worker did not return an ETag for chunk " + partNumber + "."));
+          return;
+        }
+        resolve(data);
+      } catch (err) {
+        reject(new Error("Could not read the response for chunk " + partNumber + "."));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error while uploading chunk " + partNumber + ". Check the Worker logs, CORS, and your connection."));
+    xhr.ontimeout = () => reject(new Error("Chunk " + partNumber + " timed out after 15 minutes."));
+    xhr.onabort = () => reject(new Error("Chunk " + partNumber + " was cancelled."));
+    xhr.send(chunk);
+  });
+}
+
 async function uploadToR2(file, progressCallback = null) {
 
   const user = auth.currentUser;
@@ -1030,6 +1071,7 @@ async function uploadToR2(file, progressCallback = null) {
 
   for (let firstPart = 1; firstPart <= totalParts; firstPart += 2) {
     const batch = [];
+    const batchLoaded = new Map();
 
     for (let offset = 0; offset < 2 && firstPart + offset <= totalParts; offset++) {
       const partNumber = firstPart + offset;
@@ -1038,51 +1080,25 @@ async function uploadToR2(file, progressCallback = null) {
       const chunk = file.slice(start, end);
 
       batch.push((async () => {
-        const controller = new AbortController();
-        const timeout = setTimeout(
-          () => controller.abort(),
-          15 * 60 * 1000
-        );
-
-        try {
-          const uploadRes = await fetch(
-            R2_UPLOAD_ENDPOINT + "/upload-part",
-            {
-              method: "PUT",
-              headers: {
-                "Authorization": "Bearer " + token,
-                "x-upload-id": uploadId,
-                "x-part-number": String(partNumber),
-                "x-key": key,
-                "Content-Type": "application/octet-stream"
-              },
-              body: chunk,
-              signal: controller.signal
-            }
-          );
-
-          if (!uploadRes.ok) {
-            throw new Error("Chunk " + partNumber + " failed (HTTP " + uploadRes.status + ")");
+        const uploadData = await uploadMultipartPart({
+          token,
+          uploadId,
+          key,
+          partNumber,
+          chunk,
+          onProgress: (loaded) => {
+            batchLoaded.set(partNumber, loaded);
+            const liveBatchBytes = Array.from(batchLoaded.values()).reduce((sum, value) => sum + value, 0);
+            const livePercent = Math.min(98, Math.round(((uploadedBytes + liveBatchBytes) / file.size) * 100));
+            if (progressCallback) progressCallback(livePercent);
           }
+        });
 
-          const uploadData = await uploadRes.json();
-          if (!uploadData.etag) {
-            throw new Error("Worker did not return an ETag for chunk " + partNumber + ".");
-          }
-
-          return {
-            partNumber,
-            etag: uploadData.etag,
-            bytes: end - start
-          };
-        } catch (err) {
-          if (err.name === "AbortError") {
-            throw new Error("Chunk " + partNumber + " timed out after 15 minutes.");
-          }
-          throw err;
-        } finally {
-          clearTimeout(timeout);
-        }
+        return {
+          partNumber,
+          etag: uploadData.etag,
+          bytes: end - start
+        };
       })());
     }
 
@@ -1096,6 +1112,7 @@ async function uploadToR2(file, progressCallback = null) {
         etag: part.etag
       });
     }
+    batchLoaded.clear();
 
     const percent = Math.min(98, Math.round((uploadedBytes / file.size) * 100));
     if (progressCallback) {
