@@ -959,173 +959,170 @@ async function uploadToR2(file, progressCallback = null) {
     (file.name || "file")
       .replace(/[^a-zA-Z0-9._-]/g, "");
 
-  // START MULTIPART
-  const startRes = await fetch(
-  R2_UPLOAD_ENDPOINT + "/create-upload",
-  {
-     method: "POST",
-
-      headers: {
-        "Authorization": "Bearer " + token,
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        fileName: safeName,
-        contentType:
-          file.type || "application/octet-stream"
-      })
-    }
+  // Start the multipart upload. Fail clearly if the Worker does not respond.
+  const startController = new AbortController();
+  const startTimeout = setTimeout(
+    () => startController.abort(),
+    2 * 60 * 1000
   );
 
-  if (!startRes.ok) {
-    throw new Error(
-      "Failed to start multipart upload"
+  let startRes;
+  try {
+    startRes = await fetch(
+      R2_UPLOAD_ENDPOINT + "/create-upload",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          fileName: safeName,
+          contentType: file.type || "application/octet-stream"
+        }),
+        signal: startController.signal
+      }
     );
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Starting upload timed out after 2 minutes. Check the Cloudflare Worker.");
+    }
+    throw new Error("Could not start upload: " + err.message);
+  } finally {
+    clearTimeout(startTimeout);
+  }
+
+  if (!startRes.ok) {
+    throw new Error("Failed to start multipart upload (HTTP " + startRes.status + ")");
   }
 
   const startData = await startRes.json();
-
   const uploadId = startData.uploadId;
   const key = startData.key;
 
-  // BIGGER chunks = MUCH faster
-const CHUNK_SIZE = 50 * 1024 * 1024;
+  if (!uploadId || !key) {
+    throw new Error("Worker did not return an upload ID and file key.");
+  }
 
-const parts = [];
+  // Upload at most two 50 MB parts at a time instead of flooding the browser/Worker.
+  const CHUNK_SIZE = 50 * 1024 * 1024;
+  const parts = [];
+  let uploadedBytes = 0;
+  const totalParts = Math.ceil(file.size / CHUNK_SIZE);
 
-const uploadPromises = [];
+  for (let firstPart = 1; firstPart <= totalParts; firstPart += 2) {
+    const batch = [];
 
-let uploadedBytes = 0;
+    for (let offset = 0; offset < 2 && firstPart + offset <= totalParts; offset++) {
+      const partNumber = firstPart + offset;
+      const start = (partNumber - 1) * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
 
-const totalParts = Math.ceil(
-  file.size / CHUNK_SIZE
-);
+      batch.push((async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(),
+          15 * 60 * 1000
+        );
 
-for (
-  let partNumber = 1;
-  partNumber <= totalParts;
-  partNumber++
-) {
+        try {
+          const uploadRes = await fetch(
+            R2_UPLOAD_ENDPOINT + "/upload-part",
+            {
+              method: "PUT",
+              headers: {
+                "Authorization": "Bearer " + token,
+                "x-upload-id": uploadId,
+                "x-part-number": String(partNumber),
+                "x-key": key,
+                "Content-Type": "application/octet-stream"
+              },
+              body: chunk,
+              signal: controller.signal
+            }
+          );
 
-  const start =
-    (partNumber - 1) * CHUNK_SIZE;
+          if (!uploadRes.ok) {
+            throw new Error("Chunk " + partNumber + " failed (HTTP " + uploadRes.status + ")");
+          }
 
-  const end = Math.min(
-    start + CHUNK_SIZE,
-    file.size
-  );
+          const uploadData = await uploadRes.json();
+          if (!uploadData.etag) {
+            throw new Error("Worker did not return an ETag for chunk " + partNumber + ".");
+          }
 
-  const chunk = file.slice(start, end);
-
-  const promise = fetch(
-    R2_UPLOAD_ENDPOINT + "/upload-part",
-    {
-      method: "PUT",
-
-      headers: {
-        "Authorization":
-          "Bearer " + token,
-
-        "x-upload-id":
-          uploadId,
-
-        "x-part-number":
-          String(partNumber),
-
-        "x-key":
-          key,
-
-        "Content-Type":
-          "application/octet-stream"
-      },
-
-      body: chunk
-    }
-  )
-  .then(async (uploadRes) => {
-
-    if (!uploadRes.ok) {
-
-      throw new Error(
-        "Chunk upload failed at part " +
-        partNumber
-      );
-
-    }
-
-    const uploadData =
-      await uploadRes.json();
-
-    uploadedBytes +=
-      (end - start);
-
-    let percent = Math.round(
-      (uploadedBytes / file.size) * 100
-    );
-
-    if (percent > 98) {
-      percent = 98;
+          return {
+            partNumber,
+            etag: uploadData.etag,
+            bytes: end - start
+          };
+        } catch (err) {
+          if (err.name === "AbortError") {
+            throw new Error("Chunk " + partNumber + " timed out after 15 minutes.");
+          }
+          throw err;
+        } finally {
+          clearTimeout(timeout);
+        }
+      })());
     }
 
+    const completedBatch = await Promise.all(batch);
+    completedBatch.sort((a, b) => a.partNumber - b.partNumber);
+
+    for (const part of completedBatch) {
+      uploadedBytes += part.bytes;
+      parts.push({
+        partNumber: part.partNumber,
+        etag: part.etag
+      });
+    }
+
+    const percent = Math.min(98, Math.round((uploadedBytes / file.size) * 100));
     if (progressCallback) {
       progressCallback(percent);
     }
-
-    return {
-      partNumber,
-      etag: uploadData.etag
-    };
-  });
-
-  uploadPromises.push(promise);
-}
-
-// Upload ALL parts in parallel
-const uploadedParts =
-  await Promise.all(uploadPromises);
-
-// IMPORTANT: sort parts
-uploadedParts.sort(
-  (a, b) =>
-    a.partNumber - b.partNumber
-);
-
-parts.push(...uploadedParts);
-
-  // COMPLETE MULTIPART
-  const completeRes = await fetch(
-  R2_UPLOAD_ENDPOINT +
-    "/complete-upload",
-    {
-      method: "POST",
-
-      headers: {
-        "Authorization":
-          "Bearer " + token,
-
-        "Content-Type":
-          "application/json"
-      },
-
-      body: JSON.stringify({
-        uploadId,
-        key,
-        parts
-      })
-    }
-  );
-
-  if (!completeRes.ok) {
-
-    throw new Error(
-      "Failed to complete upload"
-    );
-
   }
 
-  const completeData =
-    await completeRes.json();
+  // Finish multipart upload. Give the Worker up to 5 minutes to respond.
+  const completeController = new AbortController();
+  const completeTimeout = setTimeout(
+    () => completeController.abort(),
+    5 * 60 * 1000
+  );
+
+  let completeRes;
+  try {
+    completeRes = await fetch(
+      R2_UPLOAD_ENDPOINT + "/complete-upload",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ uploadId, key, parts }),
+        signal: completeController.signal
+      }
+    );
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Upload parts finished, but finalizing the file timed out after 5 minutes.");
+    }
+    throw new Error("Could not finalize upload: " + err.message);
+  } finally {
+    clearTimeout(completeTimeout);
+  }
+
+  if (!completeRes.ok) {
+    throw new Error("Failed to complete upload (HTTP " + completeRes.status + ")");
+  }
+
+  const completeData = await completeRes.json();
+  if (!completeData.url || !completeData.key) {
+    throw new Error("Worker did not return the completed file URL and key.");
+  }
 
   if (progressCallback) {
     progressCallback(100);
@@ -1136,6 +1133,7 @@ parts.push(...uploadedParts);
     key: completeData.key
   };
 }
+
 function generateThumbnailBlob(file, width = 320, height = 180, seekTo = 0.5) {
   return new Promise((resolve, reject) => {
 
@@ -1269,7 +1267,9 @@ uploadSubmit.addEventListener('click', async () => {
 
 
 
-  uploadStatus.textContent = "Preparing upload...";
+  uploadStatus.textContent = videoFile
+    ? "Starting video upload..."
+    : "Starting 3D model upload...";
 
   // Start thumbnail generation
   const thumbnailPromise = videoFile
@@ -1335,7 +1335,12 @@ uploadSubmit.addEventListener('click', async () => {
 
     if (modelFile) {
       uploadStatus.textContent = "Uploading 3D model...";
-      const model = await uploadToR2(modelFile);
+      const model = await uploadToR2(
+        modelFile,
+        (percent) => {
+          uploadStatus.textContent = "Uploading 3D model... " + percent + "%";
+        }
+      );
       modelUrl = model.url;
       modelKey = model.key;
     }
