@@ -142,15 +142,15 @@ button{cursor:pointer}
 }
 
 #viewer3d:fullscreen #modelObjects {
-  width: 240px;
+  width: var(--object-panel-size, 240px);
   height: auto;
   max-height: none;
-  flex: 0 0 240px;
+  flex: 0 0 var(--object-panel-size, 240px);
 }
 
 #viewer3d:fullscreen #viewerFullscreenBtn {
   top: 16px;
-  right: 256px;
+  right: calc(var(--object-panel-size, 240px) + 16px);
 }
 
 @media (max-width: 600px) {
@@ -195,10 +195,10 @@ button{cursor:pointer}
 }
 
 #modelObjects {
-  width: 190px;
+  width: var(--object-panel-size, 190px);
   height: 420px;
   min-height: 0;
-  flex-shrink: 0;
+  flex: 0 0 var(--object-panel-size, 190px);
   padding: 14px;
   color: white;
   background: #191919;
@@ -829,12 +829,26 @@ objectList.innerHTML = `
   <p>Loading model...</p>
 `;
 
-const objectPanelSize = document.getElementById('objectPanelSize');
-if (objectPanelSize) {
-  objectPanelSize.addEventListener('input', () => {
-    container.style.setProperty('--object-panel-size', objectPanelSize.value + 'vh');
-  });
+function setupObjectPanelSizer() {
+  const slider = document.getElementById('objectPanelSize');
+  if (!slider) return;
+
+  const mobile = window.matchMedia('(max-width: 600px)').matches;
+  slider.min = mobile ? '15' : '120';
+  slider.max = mobile ? '65' : '500';
+  slider.value = mobile ? '30' : '190';
+  slider.step = mobile ? '1' : '10';
+  slider.setAttribute('aria-label', mobile ? 'Adjust object panel height' : 'Adjust object panel width');
+
+  const updateSize = () => {
+    const unit = mobile ? 'vh' : 'px';
+    container.style.setProperty('--object-panel-size', slider.value + unit);
+  };
+  slider.addEventListener('input', updateSize);
+  updateSize();
 }
+
+setupObjectPanelSizer();
 
  const width = canvasHost.clientWidth || 700;
  const height = canvasHost.clientHeight || 420;
@@ -920,12 +934,7 @@ objectList.innerHTML = `
   </div>
 `;
 
-const loadedPanelSize = document.getElementById('objectPanelSize');
-if (loadedPanelSize) {
-  loadedPanelSize.addEventListener('input', () => {
-    container.style.setProperty('--object-panel-size', loadedPanelSize.value + 'vh');
-  });
-}
+setupObjectPanelSizer();
 
 if (modelObjects.length === 0) {
   const message = document.createElement('p');
