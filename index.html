@@ -195,6 +195,7 @@ button{cursor:pointer}
 }
 
 #modelObjects {
+  position: relative;
   width: var(--object-panel-size, 190px);
   height: 420px;
   min-height: 0;
@@ -222,19 +223,44 @@ button{cursor:pointer}
   border-bottom: 1px solid #333;
 }
 
-.object-panel-size-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #ccc;
-  font-size: 12px;
+.object-panel-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 5;
+  width: 25px;
+  height: 54px;
+  transform: translateY(-50%);
+  border: 1px solid #444;
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  color: var(--blue);
+  background: #292929;
+  font: 700 22px/1 sans-serif;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
 }
 
-.object-panel-size-control input {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--blue);
-  cursor: ew-resize;
+.object-panel-resize-handle:hover {
+  background: #383838;
+}
+
+@media (max-width: 600px) {
+  .object-panel-resize-handle {
+    position: sticky;
+    display: block;
+    top: -14px;
+    left: auto;
+    width: 100%;
+    height: 25px;
+    margin: -12px 0 8px;
+    transform: none;
+    border: 0;
+    border-radius: 6px;
+    cursor: row-resize;
+    font-size: 20px;
+  }
 }
 
 .model-object-name {
@@ -260,8 +286,9 @@ button{cursor:pointer}
 
 #modelObjects {
   width: auto;
-  height: 180px;
-  max-height: 180px;
+  height: var(--object-panel-size, 30vh);
+  max-height: 65vh;
+  min-height: 90px;
   flex-shrink: 0;
   overflow-y: auto;
 }
@@ -820,32 +847,67 @@ document.addEventListener('fullscreenchange', updateFullscreenButton);
 canvasHost.innerHTML = '';
 objectList.innerHTML = `
   <div class="object-panel-controls">
+    <button type="button" class="object-panel-resize-handle" aria-label="Hold and drag to resize object panel" title="Hold and drag to resize">‹</button>
     <h4>Objects</h4>
-    <label class="object-panel-size-control">
-      <span>Panel size</span>
-      <input id="objectPanelSize" type="range" min="15" max="65" value="30" step="1" aria-label="Adjust object names panel size">
-    </label>
   </div>
   <p>Loading model...</p>
 `;
 
 function setupObjectPanelSizer() {
-  const slider = document.getElementById('objectPanelSize');
-  if (!slider) return;
+  const handle = objectList.querySelector('.object-panel-resize-handle');
+  if (!handle) return;
 
   const mobile = window.matchMedia('(max-width: 600px)').matches;
-  slider.min = mobile ? '15' : '120';
-  slider.max = mobile ? '65' : '500';
-  slider.value = mobile ? '30' : '190';
-  slider.step = mobile ? '1' : '10';
-  slider.setAttribute('aria-label', mobile ? 'Adjust object panel height' : 'Adjust object panel width');
+  handle.textContent = mobile ? '^' : '‹';
+  handle.setAttribute('aria-label', mobile
+    ? 'Hold and drag up or down to resize object panel'
+    : 'Hold and drag left or right to resize object panel');
 
-  const updateSize = () => {
-    const unit = mobile ? 'vh' : 'px';
-    container.style.setProperty('--object-panel-size', slider.value + unit);
+  // Keep the current panel size if the model list is rebuilt.
+  const current = container.style.getPropertyValue('--object-panel-size');
+  let size = current
+    ? parseFloat(current)
+    : (mobile ? Math.round(window.innerHeight * 0.30) : 190);
+
+  const minSize = mobile ? Math.round(window.innerHeight * 0.15) : 120;
+  const maxSize = mobile ? Math.round(window.innerHeight * 0.65) : 500;
+  size = Math.max(minSize, Math.min(maxSize, size));
+
+  const applySize = () => {
+    container.style.setProperty('--object-panel-size', size + (mobile ? 'px' : 'px'));
+    if (mobile) {
+      // The mobile panel is sized in pixels so dragging feels consistent.
+      container.style.setProperty('--object-panel-size', size + 'px');
+    }
   };
-  slider.addEventListener('input', updateSize);
-  updateSize();
+
+  let dragging = false;
+  let startCoordinate = 0;
+  let startSize = size;
+
+  handle.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    startCoordinate = mobile ? event.clientY : event.clientX;
+    startSize = size;
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const coordinate = mobile ? event.clientY : event.clientX;
+    const delta = coordinate - startCoordinate;
+    size = Math.max(minSize, Math.min(maxSize,
+      startSize + (mobile ? -delta : -delta)));
+    applySize();
+  });
+
+  const stopDragging = () => { dragging = false; };
+  handle.addEventListener('pointerup', stopDragging);
+  handle.addEventListener('pointercancel', stopDragging);
+  handle.addEventListener('lostpointercapture', stopDragging);
+
+  applySize();
 }
 
 setupObjectPanelSizer();
@@ -926,11 +988,8 @@ modelRoot.traverse((child) => {
 // DISPLAY OBJECT NAMES
 objectList.innerHTML = `
   <div class="object-panel-controls">
+    <button type="button" class="object-panel-resize-handle" aria-label="Hold and drag to resize object panel" title="Hold and drag to resize">‹</button>
     <h4>Objects</h4>
-    <label class="object-panel-size-control">
-      <span>Panel size</span>
-      <input id="objectPanelSize" type="range" min="15" max="65" value="30" step="1" aria-label="Adjust object names panel size">
-    </label>
   </div>
 `;
 
