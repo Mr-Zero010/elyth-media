@@ -94,7 +94,66 @@ button{cursor:pointer}
 .no-model-message{color:var(--muted);padding:20px;text-align:center;background:#f9fafb;border-radius:10px;font-size:14px}
 
 /* 3D viewer within video page */
-#viewer3d{width:100%;height:420px;background:#111;border-radius:10px;overflow:hidden}
+#viewer3d {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  min-height: 420px;
+  background: #111;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#viewerCanvas {
+  flex: 1;
+  min-width: 0;
+  height: 420px;
+}
+
+#viewerCanvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#modelObjects {
+  width: 190px;
+  flex-shrink: 0;
+  padding: 14px;
+  color: white;
+  background: #191919;
+  overflow-y: auto;
+}
+
+#modelObjects h4 {
+  margin: 0 0 12px;
+  color: var(--blue);
+}
+
+.model-object-name {
+  padding: 8px;
+  margin-bottom: 5px;
+  border-radius: 6px;
+  background: #252525;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  #viewer3d {
+    flex-direction: column;
+  }
+
+  #viewerCanvas {
+    width: 100%;
+    flex: none;
+  }
+
+  #modelObjects {
+    width: auto;
+    max-height: 180px;
+  }
+}
 /* ================================
    ELYTH BOTTOM NAVIGATION
 ================================ */
@@ -615,8 +674,15 @@ function load3DViewer(modelUrl) {
   }
 
   const container = document.getElementById('viewer3d');
-  if (!container) return;
-  container.innerHTML = '';
+if (!container) return;
+
+const canvasHost = document.getElementById('viewerCanvas');
+const objectList = document.getElementById('modelObjects');
+
+if (!canvasHost || !objectList) return;
+
+canvasHost.innerHTML = '';
+objectList.innerHTML = '<h4>Objects</h4><p>Loading model...</p>';
 
   const width = container.clientWidth || 980;
   const height = container.clientHeight || 420;
@@ -634,7 +700,35 @@ function load3DViewer(modelUrl) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
-  container.appendChild(renderer.domElement);
+  if (!modelRoot) {
+  throw new Error("No scene in model");
+}
+// READ OBJECT NAMES FROM GLB
+const modelObjects = [];
+
+modelRoot.traverse((child) => {
+  if (child.name && child !== modelRoot) {
+    modelObjects.push(child);
+  }
+});
+
+// DISPLAY OBJECT NAMES
+objectList.innerHTML = '<h4>Objects</h4>';
+
+if (modelObjects.length === 0) {
+  const message = document.createElement('p');
+  message.textContent = 'No named objects found';
+  objectList.appendChild(message);
+} else {
+  modelObjects.forEach((object) => {
+    const item = document.createElement('div');
+
+    item.className = 'model-object-name';
+    item.textContent = object.name;
+
+    objectList.appendChild(item);
+  });
+}
 
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
   camera.position.set(0, 1.2, 3);
@@ -2278,7 +2372,14 @@ async function loadVideoPage(videoId) {
     html += `
       <div class="model-section">
         <h3>🎨 3D Model Viewer</h3>
-        <div id="viewer3d"></div>
+        <div id="viewer3d">
+  <div id="viewerCanvas"></div>
+
+  <div id="modelObjects">
+    <h4>Objects</h4>
+    <p>Loading model...</p>
+  </div>
+</div>
       </div>
     `;
   } else if (v.videoUrl) {
