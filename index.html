@@ -126,12 +126,9 @@ button{cursor:pointer}
 }
 
 #viewer3d:fullscreen {
-  display: flex;
-  box-sizing: border-box;
-  width: 100vw !important;
-  height: 100vh !important;
-  min-height: 100vh !important;
-  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
   flex-direction: row;
   border-radius: 0;
   gap: 0;
@@ -139,20 +136,14 @@ button{cursor:pointer}
 }
 
 #viewer3d:fullscreen #viewerCanvas {
-  display: block;
-  box-sizing: border-box;
   width: auto;
   height: 100%;
-  min-width: 0;
-  min-height: 0;
-  flex: 1 1 auto;
+  flex: 1;
 }
 
 #viewer3d:fullscreen #modelObjects {
-  box-sizing: border-box;
   width: var(--object-panel-size, 240px);
-  height: 100%;
-  min-height: 0;
+  height: auto;
   max-height: none;
   flex: 0 0 var(--object-panel-size, 240px);
 }
@@ -168,10 +159,8 @@ button{cursor:pointer}
   }
 
   #viewer3d:fullscreen #viewerCanvas {
-    box-sizing: border-box;
     width: 100%;
     height: auto;
-    min-width: 0;
     min-height: 0;
     flex: 1 1 auto;
   }
@@ -206,8 +195,6 @@ button{cursor:pointer}
 }
 
 #modelObjects {
-  position: relative;
-  box-sizing: border-box;
   width: var(--object-panel-size, 190px);
   height: 420px;
   min-height: 0;
@@ -229,55 +216,25 @@ button{cursor:pointer}
   position: sticky;
   top: -14px;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   margin: -14px -14px 10px;
   padding: 12px 14px 10px;
   background: #191919;
   border-bottom: 1px solid #333;
 }
 
-.object-panel-controls h4 {
-  margin: 0;
+.object-panel-size-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.object-panel-size-control input {
+  flex: 1;
   min-width: 0;
-}
-
-.object-panel-resize-handle {
-  position: static;
-  flex: 0 0 34px;
-  width: 34px;
-  height: 32px;
-  padding: 0;
-  transform: none;
-  border: 1px solid #444;
-  border-radius: 7px;
-  color: var(--blue);
-  background: #292929;
-  font: 700 22px/1 sans-serif;
-  cursor: col-resize;
-  touch-action: none;
-  user-select: none;
-}
-
-.object-panel-resize-handle:hover {
-  background: #383838;
-}
-
-@media (max-width: 600px) {
-  .object-panel-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .object-panel-resize-handle {
-    flex: 0 0 28px;
-    width: 100%;
-    height: 28px;
-    cursor: row-resize;
-    font-size: 20px;
-  }
+  accent-color: var(--blue);
+  cursor: ew-resize;
 }
 
 .model-object-name {
@@ -303,9 +260,8 @@ button{cursor:pointer}
 
 #modelObjects {
   width: auto;
-  height: var(--object-panel-size, 30vh);
-  max-height: 65vh;
-  min-height: 90px;
+  height: 180px;
+  max-height: 180px;
   flex-shrink: 0;
   overflow-y: auto;
 }
@@ -856,7 +812,7 @@ const updateFullscreenButton = () => {
   fullscreenBtn.textContent = isFullscreen ? '⤢ Exit fullscreen' : '⛶ Fullscreen';
   fullscreenBtn.title = isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
   fullscreenBtn.setAttribute('aria-label', fullscreenBtn.title);
-  scheduleCanvasResize();
+  requestAnimationFrame(onResize);
 };
 
 document.addEventListener('fullscreenchange', updateFullscreenButton);
@@ -864,72 +820,32 @@ document.addEventListener('fullscreenchange', updateFullscreenButton);
 canvasHost.innerHTML = '';
 objectList.innerHTML = `
   <div class="object-panel-controls">
-    <button type="button" class="object-panel-resize-handle" aria-label="Hold and drag to resize object panel" title="Hold and drag to resize">‹</button>
     <h4>Objects</h4>
+    <label class="object-panel-size-control">
+      <span>Panel size</span>
+      <input id="objectPanelSize" type="range" min="15" max="65" value="30" step="1" aria-label="Adjust object names panel size">
+    </label>
   </div>
   <p>Loading model...</p>
 `;
 
-let objectPanelIsDragging = false;
-
 function setupObjectPanelSizer() {
-  const handle = objectList.querySelector('.object-panel-resize-handle');
-  if (!handle) return;
+  const slider = document.getElementById('objectPanelSize');
+  if (!slider) return;
 
   const mobile = window.matchMedia('(max-width: 600px)').matches;
-  handle.textContent = mobile ? '^' : '‹';
-  handle.setAttribute('aria-label', mobile
-    ? 'Hold and drag up or down to resize object panel'
-    : 'Hold and drag left or right to resize object panel');
+  slider.min = mobile ? '15' : '120';
+  slider.max = mobile ? '65' : '500';
+  slider.value = mobile ? '30' : '190';
+  slider.step = mobile ? '1' : '10';
+  slider.setAttribute('aria-label', mobile ? 'Adjust object panel height' : 'Adjust object panel width');
 
-  // Keep the current panel size if the model list is rebuilt.
-  const current = container.style.getPropertyValue('--object-panel-size');
-  let size = current
-    ? parseFloat(current)
-    : (mobile ? Math.round(window.innerHeight * 0.30) : 190);
-
-  const minSize = mobile ? Math.round(window.innerHeight * 0.15) : 120;
-  const maxSize = mobile ? Math.round(window.innerHeight * 0.65) : 500;
-  size = Math.max(minSize, Math.min(maxSize, size));
-
-  const applySize = () => {
-    // Pixel sizing works for both the desktop sidebar width and mobile panel height.
-    container.style.setProperty('--object-panel-size', size + 'px');
+  const updateSize = () => {
+    const unit = mobile ? 'vh' : 'px';
+    container.style.setProperty('--object-panel-size', slider.value + unit);
   };
-
-  let dragging = false;
-  let startCoordinate = 0;
-  let startSize = size;
-
-  handle.addEventListener('pointerdown', (event) => {
-    dragging = true;
-    objectPanelIsDragging = true;
-    startCoordinate = mobile ? event.clientY : event.clientX;
-    startSize = size;
-    handle.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  });
-
-  handle.addEventListener('pointermove', (event) => {
-    if (!dragging) return;
-    const coordinate = mobile ? event.clientY : event.clientX;
-    const delta = coordinate - startCoordinate;
-    size = Math.max(minSize, Math.min(maxSize,
-      startSize + (mobile ? -delta : -delta)));
-    applySize();
-  });
-
-  const stopDragging = () => {
-    if (!dragging) return;
-    dragging = false;
-    objectPanelIsDragging = false;
-    if (typeof scheduleCanvasResize === 'function') scheduleCanvasResize();
-  };
-  handle.addEventListener('pointerup', stopDragging);
-  handle.addEventListener('pointercancel', stopDragging);
-  handle.addEventListener('lostpointercapture', stopDragging);
-
-  applySize();
+  slider.addEventListener('input', updateSize);
+  updateSize();
 }
 
 setupObjectPanelSizer();
@@ -1010,8 +926,11 @@ modelRoot.traverse((child) => {
 // DISPLAY OBJECT NAMES
 objectList.innerHTML = `
   <div class="object-panel-controls">
-    <button type="button" class="object-panel-resize-handle" aria-label="Hold and drag to resize object panel" title="Hold and drag to resize">‹</button>
     <h4>Objects</h4>
+    <label class="object-panel-size-control">
+      <span>Panel size</span>
+      <input id="objectPanelSize" type="range" min="15" max="65" value="30" step="1" aria-label="Adjust object names panel size">
+    </label>
   </div>
 `;
 
@@ -1205,45 +1124,15 @@ controls.update();
   }
 );
 
-  let lastRenderWidth = width;
-  let lastRenderHeight = height;
-  let resizeFrame = 0;
-
   function onResize() {
-    if (!container || !canvasHost.isConnected) return;
-
-    // While the desktop sidebar is being dragged, CSS resizes the visible
-    // canvas. Delay the expensive WebGL drawing-buffer resize until release.
-    if (objectPanelIsDragging) return;
-
-    const w = Math.max(1, Math.round(canvasHost.clientWidth));
-    const h = Math.max(1, Math.round(canvasHost.clientHeight));
-    if (!w || !h) return;
-
-    if (w === lastRenderWidth && h === lastRenderHeight) return;
-
-    lastRenderWidth = w;
-    lastRenderHeight = h;
-
-    renderer.setSize(w, h, false);
+    if (!container) return;
+    const w = canvasHost.clientWidth;
+    const h = canvasHost.clientHeight;
+    renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
-
-  function scheduleCanvasResize() {
-    if (resizeFrame) return;
-    resizeFrame = requestAnimationFrame(() => {
-      resizeFrame = 0;
-      onResize();
-    });
-  }
-
-  window.addEventListener('resize', scheduleCanvasResize);
-
-  // Observe the canvas host, but coalesce notifications to one resize per
-  // animation frame. This prevents repeated WebGL buffer resets while dragging.
-  const canvasResizeObserver = new ResizeObserver(scheduleCanvasResize);
-  canvasResizeObserver.observe(canvasHost);
+  window.addEventListener('resize', onResize);
 
   const clock = new THREE.Clock();
   let rafId = null;
@@ -1268,9 +1157,7 @@ controls.update();
       cancelAnimationFrame(rafId);
     }
 
-    window.removeEventListener('resize', scheduleCanvasResize);
-    canvasResizeObserver.disconnect();
-    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    window.removeEventListener('resize', onResize);
     document.removeEventListener('fullscreenchange', updateFullscreenButton);
 
     try {
