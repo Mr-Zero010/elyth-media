@@ -153,6 +153,35 @@ button{cursor:pointer}
   right: 256px;
 }
 
+@media (max-width: 600px) {
+  #viewer3d:fullscreen {
+    flex-direction: column;
+  }
+
+  #viewer3d:fullscreen #viewerCanvas {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  #viewer3d:fullscreen #modelObjects {
+    box-sizing: border-box;
+    width: 100%;
+    height: var(--object-panel-size, 30vh);
+    max-height: 65vh;
+    min-height: 90px;
+    flex: 0 0 var(--object-panel-size, 30vh);
+    overflow-y: auto;
+    border-top: 2px solid #444;
+  }
+
+  #viewer3d:fullscreen #viewerFullscreenBtn {
+    top: 12px;
+    right: 12px;
+  }
+}
+
 #viewerCanvas {
   flex: 1;
   min-width: 0;
@@ -181,6 +210,31 @@ button{cursor:pointer}
 #modelObjects h4 {
   margin: 0 0 12px;
   color: var(--blue);
+}
+
+.object-panel-controls {
+  position: sticky;
+  top: -14px;
+  z-index: 2;
+  margin: -14px -14px 10px;
+  padding: 12px 14px 10px;
+  background: #191919;
+  border-bottom: 1px solid #333;
+}
+
+.object-panel-size-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.object-panel-size-control input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--blue);
+  cursor: ew-resize;
 }
 
 .model-object-name {
@@ -764,7 +818,23 @@ const updateFullscreenButton = () => {
 document.addEventListener('fullscreenchange', updateFullscreenButton);
 
 canvasHost.innerHTML = '';
-objectList.innerHTML = '<h4>Objects</h4><p>Loading model...</p>';
+objectList.innerHTML = `
+  <div class="object-panel-controls">
+    <h4>Objects</h4>
+    <label class="object-panel-size-control">
+      <span>Panel size</span>
+      <input id="objectPanelSize" type="range" min="15" max="65" value="30" step="1" aria-label="Adjust object names panel size">
+    </label>
+  </div>
+  <p>Loading model...</p>
+`;
+
+const objectPanelSize = document.getElementById('objectPanelSize');
+if (objectPanelSize) {
+  objectPanelSize.addEventListener('input', () => {
+    container.style.setProperty('--object-panel-size', objectPanelSize.value + 'vh');
+  });
+}
 
  const width = canvasHost.clientWidth || 700;
  const height = canvasHost.clientHeight || 420;
@@ -840,7 +910,22 @@ modelRoot.traverse((child) => {
 });
 
 // DISPLAY OBJECT NAMES
-objectList.innerHTML = '<h4>Objects</h4>';
+objectList.innerHTML = `
+  <div class="object-panel-controls">
+    <h4>Objects</h4>
+    <label class="object-panel-size-control">
+      <span>Panel size</span>
+      <input id="objectPanelSize" type="range" min="15" max="65" value="30" step="1" aria-label="Adjust object names panel size">
+    </label>
+  </div>
+`;
+
+const loadedPanelSize = document.getElementById('objectPanelSize');
+if (loadedPanelSize) {
+  loadedPanelSize.addEventListener('input', () => {
+    container.style.setProperty('--object-panel-size', loadedPanelSize.value + 'vh');
+  });
+}
 
 if (modelObjects.length === 0) {
   const message = document.createElement('p');
