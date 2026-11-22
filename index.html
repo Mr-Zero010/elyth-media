@@ -1186,22 +1186,41 @@ controls.update();
   }
 );
 
+  let lastRenderWidth = width;
+  let lastRenderHeight = height;
+  let resizeFrame = 0;
+
   function onResize() {
-    if (!container) return;
-    const w = Math.max(1, canvasHost.clientWidth);
-    const h = Math.max(1, canvasHost.clientHeight);
-    renderer.setSize(w, h);
+    if (!container || !canvasHost.isConnected) return;
+
+    const w = Math.max(1, Math.round(canvasHost.clientWidth));
+    const h = Math.max(1, Math.round(canvasHost.clientHeight));
+
+    // Avoid resetting the WebGL drawing buffer when the measured size has
+    // not actually changed. Keep CSS in control of the canvas display size.
+    if (w === lastRenderWidth && h === lastRenderHeight) return;
+
+    lastRenderWidth = w;
+    lastRenderHeight = h;
+
+    renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
 
-  window.addEventListener('resize', onResize);
+  function scheduleCanvasResize() {
+    if (resizeFrame) return;
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      onResize();
+    });
+  }
 
-  // Resizing the object panel changes the canvas flex size without a window
-  // resize event. Keep the WebGL canvas fitted to the space it actually gets.
-  const canvasResizeObserver = new ResizeObserver(() => {
-    requestAnimationFrame(onResize);
-  });
+  window.addEventListener('resize', scheduleCanvasResize);
+
+  // Observe the canvas host, but coalesce notifications to one resize per
+  // animation frame. This prevents repeated WebGL buffer resets while dragging.
+  const canvasResizeObserver = new ResizeObserver(scheduleCanvasResize);
   canvasResizeObserver.observe(canvasHost);
 
   const clock = new THREE.Clock();
@@ -1227,8 +1246,9 @@ controls.update();
       cancelAnimationFrame(rafId);
     }
 
-    window.removeEventListener('resize', onResize);
+    window.removeEventListener('resize', scheduleCanvasResize);
     canvasResizeObserver.disconnect();
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
     document.removeEventListener('fullscreenchange', updateFullscreenButton);
 
     try {
