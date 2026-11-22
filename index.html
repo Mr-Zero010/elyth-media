@@ -684,9 +684,8 @@ if (!canvasHost || !objectList) return;
 canvasHost.innerHTML = '';
 objectList.innerHTML = '<h4>Objects</h4><p>Loading model...</p>';
 
-  const width = container.clientWidth || 980;
-  const height = container.clientHeight || 420;
-
+ const width = canvasHost.clientWidth || 700;
+ const height = canvasHost.clientHeight || 420;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111111);
 
@@ -697,38 +696,11 @@ objectList.innerHTML = '<h4>Objects</h4><p>Loading model...</p>';
   renderer.setSize(width, height);
   renderer.setClearColor(0x111111, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  canvasHost.appendChild(renderer.domElement);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
-  if (!modelRoot) {
-  throw new Error("No scene in model");
-}
-// READ OBJECT NAMES FROM GLB
-const modelObjects = [];
-
-modelRoot.traverse((child) => {
-  if (child.name && child !== modelRoot) {
-    modelObjects.push(child);
-  }
-});
-
-// DISPLAY OBJECT NAMES
-objectList.innerHTML = '<h4>Objects</h4>';
-
-if (modelObjects.length === 0) {
-  const message = document.createElement('p');
-  message.textContent = 'No named objects found';
-  objectList.appendChild(message);
-} else {
-  modelObjects.forEach((object) => {
-    const item = document.createElement('div');
-
-    item.className = 'model-object-name';
-    item.textContent = object.name;
-
-    objectList.appendChild(item);
-  });
-}
+  
 
   const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
   camera.position.set(0, 1.2, 3);
@@ -776,7 +748,30 @@ loader.setDRACOLoader(dracoLoader);
     if (!modelRoot) {
       throw new Error("No scene in model");
     }
+// READ OBJECT NAMES FROM GLB
+const modelObjects = [];
 
+modelRoot.traverse((child) => {
+  if (child.name && child !== modelRoot) {
+    modelObjects.push(child);
+  }
+});
+
+// DISPLAY OBJECT NAMES
+objectList.innerHTML = '<h4>Objects</h4>';
+
+if (modelObjects.length === 0) {
+  const message = document.createElement('p');
+  message.textContent = 'No named objects found';
+  objectList.appendChild(message);
+} else {
+  modelObjects.forEach((object) => {
+    const item = document.createElement('div');
+    item.className = 'model-object-name';
+    item.textContent = object.name;
+    objectList.appendChild(item);
+  });
+}
 
     const axes = new THREE.AxesHelper(5);
 scene.add(axes);
@@ -949,14 +944,14 @@ controls.update();
       ">
         Failed to load 3D model
       </div>
-    `;
+    `;    
   }
 );
 
   function onResize() {
     if (!container) return;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
+    const w = canvasHost.clientWidth;
+    const h = canvasHost.clientHeight;
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
