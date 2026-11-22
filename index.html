@@ -196,6 +196,7 @@ button{cursor:pointer}
 
 #modelObjects {
   position: relative;
+  box-sizing: border-box;
   width: var(--object-panel-size, 190px);
   height: 420px;
   min-height: 0;
@@ -217,23 +218,30 @@ button{cursor:pointer}
   position: sticky;
   top: -14px;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin: -14px -14px 10px;
   padding: 12px 14px 10px;
   background: #191919;
   border-bottom: 1px solid #333;
 }
 
+.object-panel-controls h4 {
+  margin: 0;
+  min-width: 0;
+}
+
 .object-panel-resize-handle {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  z-index: 5;
-  width: 25px;
-  height: 54px;
-  transform: translateY(-50%);
+  position: static;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  transform: none;
   border: 1px solid #444;
-  border-left: 0;
-  border-radius: 0 8px 8px 0;
+  border-radius: 7px;
   color: var(--blue);
   background: #292929;
   font: 700 22px/1 sans-serif;
@@ -247,17 +255,15 @@ button{cursor:pointer}
 }
 
 @media (max-width: 600px) {
+  .object-panel-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .object-panel-resize-handle {
-    position: sticky;
-    display: block;
-    top: -14px;
-    left: auto;
+    flex: 0 0 28px;
     width: 100%;
-    height: 25px;
-    margin: -12px 0 8px;
-    transform: none;
-    border: 0;
-    border-radius: 6px;
+    height: 28px;
     cursor: row-resize;
     font-size: 20px;
   }
@@ -874,11 +880,8 @@ function setupObjectPanelSizer() {
   size = Math.max(minSize, Math.min(maxSize, size));
 
   const applySize = () => {
-    container.style.setProperty('--object-panel-size', size + (mobile ? 'px' : 'px'));
-    if (mobile) {
-      // The mobile panel is sized in pixels so dragging feels consistent.
-      container.style.setProperty('--object-panel-size', size + 'px');
-    }
+    // Pixel sizing works for both the desktop sidebar width and mobile panel height.
+    container.style.setProperty('--object-panel-size', size + 'px');
   };
 
   let dragging = false;
@@ -1185,13 +1188,21 @@ controls.update();
 
   function onResize() {
     if (!container) return;
-    const w = canvasHost.clientWidth;
-    const h = canvasHost.clientHeight;
+    const w = Math.max(1, canvasHost.clientWidth);
+    const h = Math.max(1, canvasHost.clientHeight);
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
+
   window.addEventListener('resize', onResize);
+
+  // Resizing the object panel changes the canvas flex size without a window
+  // resize event. Keep the WebGL canvas fitted to the space it actually gets.
+  const canvasResizeObserver = new ResizeObserver(() => {
+    requestAnimationFrame(onResize);
+  });
+  canvasResizeObserver.observe(canvasHost);
 
   const clock = new THREE.Clock();
   let rafId = null;
@@ -1217,6 +1228,7 @@ controls.update();
     }
 
     window.removeEventListener('resize', onResize);
+    canvasResizeObserver.disconnect();
     document.removeEventListener('fullscreenchange', updateFullscreenButton);
 
     try {
