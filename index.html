@@ -126,9 +126,12 @@ button{cursor:pointer}
 }
 
 #viewer3d:fullscreen {
-  width: 100vw;
-  height: 100vh;
-  min-height: 100vh;
+  display: flex;
+  box-sizing: border-box;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: 100vh;
   flex-direction: row;
   border-radius: 0;
   gap: 0;
@@ -136,14 +139,20 @@ button{cursor:pointer}
 }
 
 #viewer3d:fullscreen #viewerCanvas {
+  display: block;
+  box-sizing: border-box;
   width: auto;
   height: 100%;
-  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 #viewer3d:fullscreen #modelObjects {
+  box-sizing: border-box;
   width: var(--object-panel-size, 240px);
-  height: auto;
+  height: 100%;
+  min-height: 0;
   max-height: none;
   flex: 0 0 var(--object-panel-size, 240px);
 }
@@ -159,8 +168,10 @@ button{cursor:pointer}
   }
 
   #viewer3d:fullscreen #viewerCanvas {
+    box-sizing: border-box;
     width: 100%;
     height: auto;
+    min-width: 0;
     min-height: 0;
     flex: 1 1 auto;
   }
@@ -845,7 +856,7 @@ const updateFullscreenButton = () => {
   fullscreenBtn.textContent = isFullscreen ? '⤢ Exit fullscreen' : '⛶ Fullscreen';
   fullscreenBtn.title = isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
   fullscreenBtn.setAttribute('aria-label', fullscreenBtn.title);
-  requestAnimationFrame(onResize);
+  scheduleCanvasResize();
 };
 
 document.addEventListener('fullscreenchange', updateFullscreenButton);
@@ -858,6 +869,8 @@ objectList.innerHTML = `
   </div>
   <p>Loading model...</p>
 `;
+
+let objectPanelIsDragging = false;
 
 function setupObjectPanelSizer() {
   const handle = objectList.querySelector('.object-panel-resize-handle');
@@ -890,6 +903,7 @@ function setupObjectPanelSizer() {
 
   handle.addEventListener('pointerdown', (event) => {
     dragging = true;
+    objectPanelIsDragging = true;
     startCoordinate = mobile ? event.clientY : event.clientX;
     startSize = size;
     handle.setPointerCapture(event.pointerId);
@@ -905,7 +919,12 @@ function setupObjectPanelSizer() {
     applySize();
   });
 
-  const stopDragging = () => { dragging = false; };
+  const stopDragging = () => {
+    if (!dragging) return;
+    dragging = false;
+    objectPanelIsDragging = false;
+    if (typeof scheduleCanvasResize === 'function') scheduleCanvasResize();
+  };
   handle.addEventListener('pointerup', stopDragging);
   handle.addEventListener('pointercancel', stopDragging);
   handle.addEventListener('lostpointercapture', stopDragging);
@@ -1193,11 +1212,14 @@ controls.update();
   function onResize() {
     if (!container || !canvasHost.isConnected) return;
 
+    // While the desktop sidebar is being dragged, CSS resizes the visible
+    // canvas. Delay the expensive WebGL drawing-buffer resize until release.
+    if (objectPanelIsDragging) return;
+
     const w = Math.max(1, Math.round(canvasHost.clientWidth));
     const h = Math.max(1, Math.round(canvasHost.clientHeight));
+    if (!w || !h) return;
 
-    // Avoid resetting the WebGL drawing buffer when the measured size has
-    // not actually changed. Keep CSS in control of the canvas display size.
     if (w === lastRenderWidth && h === lastRenderHeight) return;
 
     lastRenderWidth = w;
