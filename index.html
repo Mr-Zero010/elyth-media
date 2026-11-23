@@ -232,22 +232,27 @@ button{cursor:pointer}
   background: #383838;
 }
 
-.model-object-name {
-  padding: 8px;
+.model-object-row {
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
   margin-bottom: 5px;
-  border-radius: 6px;
-  background: #252525;
-  font-size: 13px;
-  overflow-wrap: anywhere;
 }
 
 .model-object-name {
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: #252525;
   box-sizing: border-box;
   color: #fff;
   font: inherit;
+  font-size: 13px;
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
   border: 1px solid transparent;
   transition: background .12s ease, border-color .12s ease;
@@ -261,6 +266,33 @@ button{cursor:pointer}
   background: rgba(11, 227, 255, .14);
   border-color: var(--blue);
   color: #fff;
+}
+
+.model-object-visibility {
+  flex: 0 0 34px;
+  width: 34px;
+  min-height: 34px;
+  padding: 4px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: var(--blue);
+  background: #252525;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.model-object-visibility:hover {
+  background: #383838;
+}
+
+.model-object-visibility[aria-pressed="false"] {
+  color: #888;
+  background: #1d1d1d;
+}
+
+.model-object-row.is-hidden .model-object-name {
+  color: #888;
+  opacity: .7;
 }
 
 @media (max-width: 600px) {
@@ -1022,6 +1054,10 @@ if (modelObjects.length === 0) {
   objectList.appendChild(message);
 } else {
   modelObjects.forEach((object, index) => {
+    const row = document.createElement('div');
+    row.className = 'model-object-row';
+    row.dataset.objectIndex = String(index);
+
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'model-object-name';
@@ -1029,7 +1065,19 @@ if (modelObjects.length === 0) {
     item.dataset.objectIndex = String(index);
     item.setAttribute('aria-pressed', 'false');
     item.title = 'Select ' + object.name;
-    objectList.appendChild(item);
+
+    const visibility = document.createElement('button');
+    visibility.type = 'button';
+    visibility.className = 'model-object-visibility';
+    visibility.textContent = '◉';
+    visibility.dataset.objectIndex = String(index);
+    visibility.setAttribute('aria-label', 'Hide ' + object.name);
+    visibility.setAttribute('aria-pressed', 'true');
+    visibility.title = 'Hide object';
+
+    row.appendChild(item);
+    row.appendChild(visibility);
+    objectList.appendChild(row);
   });
 }
 
@@ -1222,6 +1270,24 @@ objectList.querySelectorAll('.model-object-name').forEach((item) => {
   });
 });
 
+objectList.querySelectorAll('.model-object-visibility').forEach((button) => {
+  button.addEventListener('click', () => {
+    const index = Number(button.dataset.objectIndex);
+    const object = modelObjects[index];
+    const row = button.closest('.model-object-row');
+    if (!object || !row) return;
+
+    object.visible = !object.visible;
+    const isVisible = object.visible;
+
+    button.textContent = isVisible ? '◉' : '○';
+    button.setAttribute('aria-pressed', String(isVisible));
+    button.setAttribute('aria-label', (isVisible ? 'Hide ' : 'Show ') + object.name);
+    button.title = isVisible ? 'Hide object' : 'Show object';
+    row.classList.toggle('is-hidden', !isVisible);
+  });
+});
+
 let scenePointerStart = null;
 
 const rememberScenePointer = (event) => {
@@ -1245,7 +1311,14 @@ const selectSceneObject = (event) => {
   pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
   raycaster.setFromCamera(pointerNdc, camera);
-  const hits = raycaster.intersectObject(modelRoot, true);
+  const hits = raycaster.intersectObject(modelRoot, true).filter((hit) => {
+    let node = hit.object;
+    while (node && node !== modelRoot) {
+      if (!node.visible) return false;
+      node = node.parent;
+    }
+    return true;
+  });
   if (!hits.length) return;
 
   let target = hits[0].object;
