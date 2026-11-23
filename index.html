@@ -499,6 +499,53 @@ button{cursor:pointer}
   }
 }
 
+/* Pause-only object transform controls */
+#objectTransformToolbar {
+  position: absolute;
+  z-index: 24;
+  top: 54px;
+  left: 12px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 9px;
+  color: #fff;
+  background: rgba(20,20,20,.95);
+  box-shadow: 0 3px 14px rgba(0,0,0,.3);
+  font: 12px/1.2 Arial, sans-serif;
+}
+#objectTransformToolbar.is-visible { display: flex; }
+#objectTransformToolbar button {
+  padding: 6px 9px;
+  border: 1px solid #454545;
+  border-radius: 6px;
+  color: #fff;
+  background: #292929;
+  font: inherit;
+  cursor: pointer;
+}
+#objectTransformToolbar button:hover { background: #383838; }
+#objectTransformToolbar button.is-active {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+#objectTransformToolbar .transform-hint {
+  color: #aaa;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  #objectTransformToolbar {
+    top: 210px;
+    left: 10px;
+    gap: 4px;
+    padding: 6px;
+  }
+  #objectTransformToolbar button { padding: 6px 7px; }
+  #objectTransformToolbar .transform-hint { display: none; }
+}
+
 /* ================================
    ELYTH BOTTOM NAVIGATION
 ================================ */
@@ -648,6 +695,7 @@ button{cursor:pointer}
 import * as THREE from "https://unpkg.com/three@0.163.0/build/three.module.js";
 
 import { OrbitControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module";
+import { TransformControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/TransformControls.js?module";
 
 import { GLTFLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module";
 
@@ -1166,6 +1214,11 @@ loader.setDRACOLoader(dracoLoader);
   let mixer = null;
   let modelRoot = null;
   let updateAnimationFrameUI = null;
+  let transformControls = null;
+  let transformHelper = null;
+  let transformPivot = null;
+  let isAnimationPlaying = false;
+  let hasImportedAnimations = false;
 
   console.log("Model URL:", modelUrl);
 
@@ -1181,10 +1234,18 @@ loader.setDRACOLoader(dracoLoader);
     }
 // READ OBJECT NAMES FROM GLB
 const modelObjects = [];
+const originalObjectTransforms = new Map();
+const pausePoseBeforeManualTransform = new Map();
+const animatedNodes = new Set();
 
 modelRoot.traverse((child) => {
   if (child.name && child !== modelRoot) {
     modelObjects.push(child);
+    originalObjectTransforms.set(child, {
+      position: child.position.clone(),
+      quaternion: child.quaternion.clone(),
+      scale: child.scale.clone()
+    });
   }
 });
 
@@ -1366,6 +1427,91 @@ selectionCountLabel.title = 'Ctrl/⌘-click or Shift-click objects to add or rem
 const hideRemainingToggle = selectionToolbar.querySelector('#hideRemainingToggle');
 const clearObjectSelection = selectionToolbar.querySelector('#clearObjectSelection');
 
+const transformToolbar = document.createElement('div');
+transformToolbar.id = 'objectTransformToolbar';
+transformToolbar.innerHTML = `
+  <button type="button" id="transformMoveButton" class="is-active" title="Move selected object(s)">↔ Move</button>
+  <button type="button" id="transformRotateButton" title="Rotate selected object(s)">⟳ Rotate</button>
+  <button type="button" id="transformResetButton" title="Reset selected object(s) to their original transforms">Reset</button>
+  <span class="transform-hint">Available while paused</span>
+`;
+container.appendChild(transformToolbar);
+const transformMoveButton = transformToolbar.querySelector('#transformMoveButton');
+const transformRotateButton = transformToolbar.querySelector('#transformRotateButton');
+const transformResetButton = transformToolbar.querySelector('#transformResetButton');
+
+let transformStartPivotInverse = null;
+let transformStartObjects = [];
+
+function getTopLevelSelectedObjects() {
+  return Array.from(selectedObjects).filter((object) => {
+    let parent = object.parent;
+    while (parent && parent !== modelRoot.parent) {
+      if (selectedObjects.has(parent)) return false;
+      parent = parent.parent;
+    }
+    return true;
+  });
+}
+
+function updateTransformPivot() {
+  if (!transformPivot || selectedObjects.size === 0) return;
+  modelRoot.updateMatrixWorld(true);
+  const bounds = new THREE.Box3();
+  for (const object of getTopLevelSelectedObjects()) bounds.expandByObject(object);
+  if (!bounds.isEmpty()) bounds.getCenter(transformPivot.position);
+  transformPivot.quaternion.identity();
+  transformPivot.scale.set(1, 1, 1);
+  transformPivot.updateMatrixWorld(true);
+}
+
+function syncTransformControls() {
+  if (!transformControls || !transformPivot) return;
+  const canTransform = selectedObjects.size > 0 &&
+    (!hasImportedAnimations || !isAnimationPlaying);
+  transformToolbar.classList.toggle('is-visible', canTransform);
+  if (canTransform) {
+    updateTransformPivot();
+    transformControls.attach(transformPivot);
+  } else {
+    transformControls.detach();
+  }
+}
+
+function restorePausePoseBeforePlayback() {
+  for (const [object, pose] of pausePoseBeforeManualTransform) {
+    object.position.copy(pose.position);
+    object.quaternion.copy(pose.quaternion);
+    object.scale.copy(pose.scale);
+    object.updateMatrix();
+  }
+  pausePoseBeforeManualTransform.clear();
+}
+
+function applyTransformDelta() {
+  if (!transformPivot || !transformStartPivotInverse || !transformStartObjects.length) return;
+  transformPivot.updateMatrixWorld(true);
+  const delta = new THREE.Matrix4().multiplyMatrices(
+    transformPivot.matrixWorld,
+    transformStartPivotInverse
+  );
+
+  for (const entry of transformStartObjects) {
+    const nextWorld = new THREE.Matrix4().multiplyMatrices(delta, entry.worldMatrix);
+    const parent = entry.object.parent;
+    if (parent) {
+      parent.updateMatrixWorld(true);
+      const inverseParent = new THREE.Matrix4().copy(parent.matrixWorld).invert();
+      const nextLocal = new THREE.Matrix4().multiplyMatrices(inverseParent, nextWorld);
+      nextLocal.decompose(entry.object.position, entry.object.quaternion, entry.object.scale);
+    } else {
+      nextWorld.decompose(entry.object.position, entry.object.quaternion, entry.object.scale);
+    }
+    entry.object.updateMatrix();
+    entry.object.updateMatrixWorld(true);
+  }
+}
+
 function restoreObjectHighlight() {
   for (const [mesh, originalMaterial] of originalMaterials) {
     mesh.material = originalMaterial;
@@ -1490,6 +1636,7 @@ function refreshObjectSelection(scrollToLast = false) {
   } else if (isolateSelectionEnabled) {
     updateIsolationVisibility();
   }
+  syncTransformControls();
 }
 
 function selectModelObject(object, additive = false) {
@@ -1552,6 +1699,10 @@ const rememberScenePointer = (event) => {
 
 const selectSceneObject = (event) => {
   if (!scenePointerStart) return;
+  if (transformControls && (transformControls.dragging || transformControls.axis !== null)) {
+    scenePointerStart = null;
+    return;
+  }
 
   const moved = Math.hypot(
     event.clientX - scenePointerStart.x,
@@ -1593,6 +1744,66 @@ renderer.domElement.addEventListener('pointercancel', () => {
   scenePointerStart = null;
 });
 
+// TransformControls works on a temporary pivot, not by reparenting GLTF nodes.
+// This preserves the model hierarchy and the animation track bindings.
+transformPivot = new THREE.Group();
+transformPivot.name = 'ElythTransformPivot';
+scene.add(transformPivot);
+transformControls = new TransformControls(camera, renderer.domElement);
+transformHelper = transformControls.getHelper();
+scene.add(transformHelper);
+transformControls.setMode('translate');
+transformControls.addEventListener('dragging-changed', (event) => {
+  controls.enabled = !event.value;
+});
+transformControls.addEventListener('mouseDown', () => {
+  updateTransformPivot();
+  transformPivot.updateMatrixWorld(true);
+  transformStartPivotInverse = new THREE.Matrix4().copy(transformPivot.matrixWorld).invert();
+  transformStartObjects = getTopLevelSelectedObjects().map((object) => {
+    object.updateMatrixWorld(true);
+    if (hasImportedAnimations && animatedNodes.has(object) &&
+        !isAnimationPlaying && !pausePoseBeforeManualTransform.has(object)) {
+      pausePoseBeforeManualTransform.set(object, {
+        position: object.position.clone(),
+        quaternion: object.quaternion.clone(),
+        scale: object.scale.clone()
+      });
+    }
+    return { object, worldMatrix: object.matrixWorld.clone() };
+  });
+});
+transformControls.addEventListener('objectChange', applyTransformDelta);
+transformControls.addEventListener('mouseUp', () => {
+  transformStartPivotInverse = null;
+  transformStartObjects = [];
+  updateTransformPivot();
+});
+transformMoveButton.addEventListener('click', () => {
+  if (hasImportedAnimations && isAnimationPlaying) return;
+  transformControls.setMode('translate');
+  transformMoveButton.classList.add('is-active');
+  transformRotateButton.classList.remove('is-active');
+});
+transformRotateButton.addEventListener('click', () => {
+  if (hasImportedAnimations && isAnimationPlaying) return;
+  transformControls.setMode('rotate');
+  transformRotateButton.classList.add('is-active');
+  transformMoveButton.classList.remove('is-active');
+});
+transformResetButton.addEventListener('click', () => {
+  if (hasImportedAnimations && isAnimationPlaying) return;
+  for (const object of getTopLevelSelectedObjects()) {
+    const original = originalObjectTransforms.get(object);
+    if (!original) continue;
+    object.position.copy(original.position);
+    object.quaternion.copy(original.quaternion);
+    object.scale.copy(original.scale);
+    object.updateMatrix();
+  }
+  updateTransformPivot();
+});
+
 console.log("SCENE:", scene);
 console.log("MODEL:", modelRoot);
 console.log("MODEL CHILDREN:", modelRoot.children.length);
@@ -1626,12 +1837,23 @@ controls.update();
     // Imported animation playback. "All animations" plays every clip together;
     // individual clips can still be previewed separately.
     const animationClips = Array.isArray(gltf.animations) ? gltf.animations : [];
+    hasImportedAnimations = animationClips.length > 0;
+    for (const clip of animationClips) {
+      for (const track of clip.tracks || []) {
+        try {
+          const parsedTrack = THREE.PropertyBinding.parseTrackName(track.name);
+          const targetNode = THREE.PropertyBinding.findNode(modelRoot, parsedTrack.nodeName);
+          if (targetNode) animatedNodes.add(targetNode);
+        } catch (error) {
+          // An unrecognized track is left to the GLTF animation system.
+        }
+      }
+    }
     let activeActions = [];
     let activeClipIndex = -1; // -1 means all clips
     let playbackSpeed = 1;
     let loopEnabled = true;
     let animationElapsed = 0;
-    let isAnimationPlaying = false;
     let animationProgressElapsed = 0;
     let animationProgressFill = null;
     let animationTimeLabel = null;
@@ -1684,6 +1906,7 @@ controls.update();
       if (!animationPlayButton) return;
       animationPlayButton.textContent = playing ? 'Ⅱ Pause' : '▶ Play';
       animationPlayButton.setAttribute('aria-label', playing ? 'Pause animation' : 'Play animation');
+      syncTransformControls();
     };
 
     if (animationClips.length > 0) {
@@ -1774,6 +1997,7 @@ controls.update();
       };
 
       const playSelection = (index, shouldPlay = true) => {
+        if (shouldPlay) restorePausePoseBeforePlayback();
         activeActions.forEach((action) => action.stop());
         activeClipIndex = index;
         animationElapsed = 0;
@@ -1801,6 +2025,7 @@ controls.update();
           activeActions.forEach((action) => { action.paused = true; });
           setPlayButtonState(false);
         } else {
+          restorePausePoseBeforePlayback();
           const duration = getSelectedDuration();
           if (!loopEnabled && duration > 0 && animationElapsed >= duration) {
             activeActions.forEach((action) => action.reset());
@@ -1816,6 +2041,7 @@ controls.update();
       });
 
       stopButton.addEventListener('click', () => {
+        restorePausePoseBeforePlayback();
         activeActions.forEach((action) => { action.stop(); action.reset(); });
         isAnimationPlaying = false;
         animationElapsed = 0;
@@ -1839,6 +2065,8 @@ controls.update();
 
       // Start with every imported animation running together by default.
       playSelection(-1, true);
+    } else {
+      syncTransformControls();
     }
   },
 
@@ -1905,6 +2133,16 @@ controls.update();
 
     window.removeEventListener('resize', onResize);
     document.removeEventListener('fullscreenchange', updateFullscreenButton);
+
+    if (transformControls) {
+      transformControls.detach();
+      transformControls.dispose();
+      transformControls = null;
+    }
+    if (transformHelper && transformHelper.parent) {
+      transformHelper.parent.remove(transformHelper);
+      transformHelper = null;
+    }
 
     renderer.domElement.removeEventListener('pointerdown', rememberScenePointer);
     renderer.domElement.removeEventListener('pointerup', selectSceneObject);
