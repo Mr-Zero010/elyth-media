@@ -93,11 +93,11 @@ button{cursor:pointer}
 
 .no-model-message{color:var(--muted);padding:20px;text-align:center;background:#f9fafb;border-radius:10px;font-size:14px}
 
-/* 3D viewer within video page */
+/* 3D viewer: the WebGL canvas and object panel are independent layers */
 #viewer3d {
   position: relative;
-  display: flex;
-  gap: 12px;
+  display: block;
+  isolation: isolate;
   width: 100%;
   height: 420px;
   min-height: 420px;
@@ -106,10 +106,42 @@ button{cursor:pointer}
   overflow: hidden;
 }
 
+#viewerCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+#viewerCanvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#modelObjects {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  right: 0;
+  box-sizing: border-box;
+  width: var(--object-panel-size, 190px);
+  height: 100%;
+  min-height: 0;
+  padding: 14px;
+  color: white;
+  background: rgba(25, 25, 25, .97);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  border-left: 1px solid #383838;
+}
+
 #viewerFullscreenBtn {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   z-index: 20;
   border: 1px solid rgba(255,255,255,.25);
   border-radius: 8px;
@@ -126,87 +158,33 @@ button{cursor:pointer}
 }
 
 #viewer3d:fullscreen {
+  display: block;
   width: 100vw;
   height: 100vh;
   min-height: 100vh;
-  flex-direction: row;
   border-radius: 0;
-  gap: 0;
   background: #111;
 }
 
 #viewer3d:fullscreen #viewerCanvas {
-  width: auto;
-  height: 100%;
-  flex: 1;
-}
-
-#viewer3d:fullscreen #modelObjects {
-  width: var(--object-panel-size, 240px);
-  height: auto;
-  max-height: none;
-  flex: 0 0 var(--object-panel-size, 240px);
-}
-
-#viewer3d:fullscreen #viewerFullscreenBtn {
-  top: 16px;
-  right: calc(var(--object-panel-size, 240px) + 16px);
-}
-
-@media (max-width: 600px) {
-  #viewer3d:fullscreen {
-    flex-direction: column;
-  }
-
-  #viewer3d:fullscreen #viewerCanvas {
-    width: 100%;
-    height: auto;
-    min-height: 0;
-    flex: 1 1 auto;
-  }
-
-  #viewer3d:fullscreen #modelObjects {
-    box-sizing: border-box;
-    width: 100%;
-    height: var(--object-panel-size, 30vh);
-    max-height: 65vh;
-    min-height: 90px;
-    flex: 0 0 var(--object-panel-size, 30vh);
-    overflow-y: auto;
-    border-top: 2px solid #444;
-  }
-
-  #viewer3d:fullscreen #viewerFullscreenBtn {
-    top: 12px;
-    right: 12px;
-  }
-}
-
-#viewerCanvas {
-  flex: 1;
-  min-width: 0;
-  height: 420px;
-}
-
-#viewerCanvas canvas {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
 
-#modelObjects {
-  position: relative;
-  box-sizing: border-box;
+#viewer3d:fullscreen #modelObjects {
+  top: 0;
+  right: 0;
   width: var(--object-panel-size, 190px);
-  height: 420px;
-  min-height: 0;
-  flex: 0 0 var(--object-panel-size, 190px);
-  padding: 14px;
-  color: white;
-  background: #191919;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
+  height: 100%;
+  max-height: none;
+}
+
+#viewer3d:fullscreen #viewerFullscreenBtn {
+  top: 16px;
+  left: 16px;
+  right: auto;
 }
 
 #modelObjects h4 {
@@ -254,7 +232,34 @@ button{cursor:pointer}
   background: #383838;
 }
 
+.model-object-name {
+  padding: 8px;
+  margin-bottom: 5px;
+  border-radius: 6px;
+  background: #252525;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 600px) {
+  #viewer3d {
+    height: 420px;
+    min-height: 420px;
+  }
+
+  #modelObjects {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--object-panel-size, 30vh);
+    max-height: 65%;
+    min-height: 90px;
+    border-left: 0;
+    border-top: 1px solid #383838;
+  }
+
   .object-panel-controls {
     flex-direction: column;
     align-items: stretch;
@@ -267,37 +272,28 @@ button{cursor:pointer}
     cursor: row-resize;
     font-size: 20px;
   }
-}
 
-.model-object-name {
-  padding: 8px;
-  margin-bottom: 5px;
-  border-radius: 6px;
-  background: #252525;
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
+  #viewer3d:fullscreen {
+    height: 100vh;
+    min-height: 100vh;
+  }
 
-@media (max-width: 600px) {
-  #viewer3d {
-  flex-direction: column;
-  height: auto;
-  min-height: 0;
-}
+  #viewer3d:fullscreen #modelObjects {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--object-panel-size, 30vh);
+    max-height: 65vh;
+    min-height: 90px;
+    border-top: 1px solid #383838;
+  }
 
-#viewerCanvas {
-  width: 100%;
-  flex: none;
-}
-
-#modelObjects {
-  width: auto;
-  height: var(--object-panel-size, 30vh);
-  max-height: 65vh;
-  min-height: 90px;
-  flex-shrink: 0;
-  overflow-y: auto;
-}
+  #viewer3d:fullscreen #viewerFullscreenBtn {
+    top: 12px;
+    left: 12px;
+  }
 }
 
 /* ================================
@@ -1197,12 +1193,7 @@ controls.update();
 
   window.addEventListener('resize', onResize);
 
-  // Resizing the object panel changes the canvas flex size without a window
-  // resize event. Keep the WebGL canvas fitted to the space it actually gets.
-  const canvasResizeObserver = new ResizeObserver(() => {
-    requestAnimationFrame(onResize);
-  });
-  canvasResizeObserver.observe(canvasHost);
+  // The object panel is an overlay, so dragging it never resizes the canvas.
 
   const clock = new THREE.Clock();
   let rafId = null;
@@ -1228,7 +1219,6 @@ controls.update();
     }
 
     window.removeEventListener('resize', onResize);
-    canvasResizeObserver.disconnect();
     document.removeEventListener('fullscreenchange', updateFullscreenButton);
 
     try {
