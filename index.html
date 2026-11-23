@@ -8,10 +8,10 @@
 <meta name="description" content="Watch tutorials and videos on MyVideo. Sign in, upload, follow creators, and discover content.">
 
 <style>
+  --bg:#ffffff;
 :root{
   --blue:#0be3ff;
   --muted:#6b7280;
-  --bg:#ffffff;
   --card:#fff;
   --radius:12px;
   --max-width:980px;
@@ -691,15 +691,23 @@ button{cursor:pointer}
   <small id="uploadStatus"></small>
 </div>
 
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.163.0/build/three.module.js"
+  }
+}
+</script>
+
 <script type="module">
-import * as THREE from "https://unpkg.com/three@0.163.0/build/three.module.js";
+import * as THREE from "three";
 
-import { OrbitControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module";
-import { TransformControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/TransformControls.js?module";
+import { OrbitControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js";
+import { TransformControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/TransformControls.js";
 
-import { GLTFLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module";
+import { GLTFLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js";
 
-import { DRACOLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/DRACOLoader.js?module";
+import { DRACOLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/DRACOLoader.js";
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -1473,11 +1481,6 @@ function syncTransformControls() {
   if (canTransform) {
     updateTransformPivot();
     transformControls.attach(transformPivot);
-    // Keep the r163 TransformControls object and its child gizmo in sync
-    // with the freshly positioned pivot before the next render.
-    transformControls.visible = true;
-    transformPivot.updateMatrixWorld(true);
-    transformControls.updateMatrixWorld(true);
   } else {
     transformControls.detach();
   }
@@ -2129,13 +2132,6 @@ controls.update();
   if (updateAnimationFrameUI) updateAnimationFrameUI(dt);
 
   controls.update();
-
-  // Refresh the transform gizmo after camera/orbit and pivot changes.
-  if (transformControls && transformControls.object) {
-    transformControls.visible = true;
-    transformPivot.updateMatrixWorld(true);
-    transformControls.updateMatrixWorld(true);
-  }
 
   renderer.render(scene, camera);
 }
