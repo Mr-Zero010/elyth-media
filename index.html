@@ -1750,8 +1750,10 @@ transformPivot = new THREE.Group();
 transformPivot.name = 'ElythTransformPivot';
 scene.add(transformPivot);
 transformControls = new TransformControls(camera, renderer.domElement);
-transformHelper = transformControls.getHelper();
-scene.add(transformHelper);
+// Three.js r163 exposes TransformControls itself as the scene object.
+// getHelper() belongs to newer revisions and is not available in r163.
+transformHelper = transformControls;
+scene.add(transformControls);
 transformControls.setMode('translate');
 transformControls.addEventListener('dragging-changed', (event) => {
   controls.enabled = !event.value;
@@ -2136,7 +2138,9 @@ controls.update();
 
     if (transformControls) {
       transformControls.detach();
-      transformControls.dispose();
+      if (typeof transformControls.dispose === 'function') {
+        transformControls.dispose();
+      }
       transformControls = null;
     }
     if (transformHelper && transformHelper.parent) {
