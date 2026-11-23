@@ -1473,6 +1473,11 @@ function syncTransformControls() {
   if (canTransform) {
     updateTransformPivot();
     transformControls.attach(transformPivot);
+    // Keep the r163 TransformControls object and its child gizmo in sync
+    // with the freshly positioned pivot before the next render.
+    transformControls.visible = true;
+    transformPivot.updateMatrixWorld(true);
+    transformControls.updateMatrixWorld(true);
   } else {
     transformControls.detach();
   }
@@ -2124,6 +2129,13 @@ controls.update();
   if (updateAnimationFrameUI) updateAnimationFrameUI(dt);
 
   controls.update();
+
+  // Refresh the transform gizmo after camera/orbit and pivot changes.
+  if (transformControls && transformControls.object) {
+    transformControls.visible = true;
+    transformPivot.updateMatrixWorld(true);
+    transformControls.updateMatrixWorld(true);
+  }
 
   renderer.render(scene, camera);
 }
