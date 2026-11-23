@@ -1446,12 +1446,15 @@ camera.updateProjectionMatrix();
 controls.target.set(0, 0, 0);
 controls.update();
 
-    // Imported animation playback. The viewer plays clips but does not edit them.
+    // Imported animation playback. "All animations" plays every clip together;
+    // individual clips can still be previewed separately.
     const animationClips = Array.isArray(gltf.animations) ? gltf.animations : [];
-    let activeAction = null;
-    let activeClipIndex = 0;
+    let activeActions = [];
+    let activeClipIndex = -1; // -1 means all clips
     let playbackSpeed = 1;
     let loopEnabled = true;
+    let animationElapsed = 0;
+    let isAnimationPlaying = false;
     let animationProgressElapsed = 0;
     let animationProgressFill = null;
     let animationTimeLabel = null;
@@ -1464,17 +1467,35 @@ controls.update();
       return minutes + ':' + String(remainingSeconds).padStart(2, '0');
     };
 
+    const getSelectedDuration = () => {
+      if (activeClipIndex === -1) {
+        return animationClips.reduce((max, clip) => Math.max(max, Number(clip.duration) || 0), 0);
+      }
+      return Math.max(0, Number(animationClips[activeClipIndex]?.duration) || 0);
+    };
+
     const updateAnimationProgress = () => {
-      if (!activeAction || !animationProgressFill || !animationTimeLabel) return;
-      const clip = animationClips[activeClipIndex];
-      const duration = Math.max(0, Number(clip?.duration) || 0);
-      const current = duration > 0 ? Math.min(activeAction.time, duration) : 0;
+      if (!animationProgressFill || !animationTimeLabel) return;
+      const duration = getSelectedDuration();
+      const current = duration > 0 ? Math.min(animationElapsed, duration) : 0;
       const percent = duration > 0 ? (current / duration) * 100 : 0;
       animationProgressFill.style.width = percent + '%';
       animationTimeLabel.textContent = formatAnimationTime(current) + ' / ' + formatAnimationTime(duration);
     };
 
     updateAnimationFrameUI = (dt) => {
+      if (isAnimationPlaying) {
+        animationElapsed += dt * playbackSpeed;
+        const duration = getSelectedDuration();
+        if (!loopEnabled && duration > 0 && animationElapsed >= duration) {
+          animationElapsed = duration;
+          isAnimationPlaying = false;
+          activeActions.forEach((action) => { action.paused = true; });
+          setPlayButtonState(false);
+        } else if (loopEnabled && duration > 0) {
+          animationElapsed %= duration;
+        }
+      }
       animationProgressElapsed += dt;
       if (animationProgressElapsed >= 0.1) {
         animationProgressElapsed = 0;
@@ -1498,10 +1519,14 @@ controls.update();
       const topRow = document.createElement('div');
       topRow.className = 'animation-top-row';
       const clipLabel = document.createElement('label');
-      clipLabel.textContent = 'Animation';
+      clipLabel.textContent = 'View';
       clipLabel.htmlFor = 'animationClipSelect';
       const clipSelect = document.createElement('select');
       clipSelect.id = 'animationClipSelect';
+      const allOption = document.createElement('option');
+      allOption.value = 'all';
+      allOption.textContent = 'All objects (all animations)';
+      clipSelect.appendChild(allOption);
       animationClips.forEach((clip, index) => {
         const option = document.createElement('option');
         option.value = String(index);
@@ -1541,7 +1566,6 @@ controls.update();
         if (speed === 1) option.selected = true;
         speedSelect.appendChild(option);
       });
-
       buttonRow.append(animationPlayButton, stopButton, loopButton, speedSelect);
 
       const progressTrack = document.createElement('div');
@@ -1560,64 +1584,70 @@ controls.update();
       clipCountLabel.textContent = animationClips.length + (animationClips.length === 1 ? ' clip' : ' clips');
       animationTimeLabel = document.createElement('span');
       metaRow.append(clipCountLabel, animationTimeLabel);
-
       animationPanel.append(topRow, buttonRow, progressTrack, metaRow);
       container.appendChild(animationPanel);
 
       const applyLoopMode = () => {
-        if (!activeAction) return;
-        activeAction.setLoop(loopEnabled ? THREE.LoopRepeat : THREE.LoopOnce, loopEnabled ? Infinity : 1);
-        activeAction.clampWhenFinished = !loopEnabled;
+        activeActions.forEach((action) => {
+          action.setLoop(loopEnabled ? THREE.LoopRepeat : THREE.LoopOnce, loopEnabled ? Infinity : 1);
+          action.clampWhenFinished = !loopEnabled;
+        });
         loopButton.setAttribute('aria-pressed', String(loopEnabled));
         loopButton.title = loopEnabled ? 'Turn animation looping off' : 'Turn animation looping on';
       };
 
-      const playClip = (index, shouldPlay = true) => {
-        if (activeAction) activeAction.stop();
-        activeClipIndex = Math.max(0, Math.min(animationClips.length - 1, index));
-        const clip = animationClips[activeClipIndex];
-        activeAction = mixer.clipAction(clip);
-        activeAction.reset();
-        activeAction.timeScale = playbackSpeed;
-        applyLoopMode();
-        if (shouldPlay) {
-          activeAction.play();
-          setPlayButtonState(true);
-        } else {
-          activeAction.paused = true;
-          activeAction.play();
-          setPlayButtonState(false);
-        }
-        clipSelect.value = String(activeClipIndex);
+      const playSelection = (index, shouldPlay = true) => {
+        activeActions.forEach((action) => action.stop());
+        activeClipIndex = index;
+        animationElapsed = 0;
+        const clipsToPlay = index === -1 ? animationClips : [animationClips[index]];
+        activeActions = clipsToPlay.map((clip) => {
+          const action = mixer.clipAction(clip);
+          action.reset();
+          action.timeScale = playbackSpeed;
+          action.setLoop(loopEnabled ? THREE.LoopRepeat : THREE.LoopOnce, loopEnabled ? Infinity : 1);
+          action.clampWhenFinished = !loopEnabled;
+          action.play();
+          if (!shouldPlay) action.paused = true;
+          return action;
+        });
+        isAnimationPlaying = shouldPlay;
+        clipSelect.value = index === -1 ? 'all' : String(index);
+        setPlayButtonState(shouldPlay);
         updateAnimationProgress();
       };
 
       animationPlayButton.addEventListener('click', () => {
-        if (!activeAction) return;
-        const isPlaying = !activeAction.paused && activeAction.isRunning();
-        if (isPlaying) {
-          activeAction.paused = true;
+        if (!activeActions.length) return;
+        if (isAnimationPlaying) {
+          isAnimationPlaying = false;
+          activeActions.forEach((action) => { action.paused = true; });
           setPlayButtonState(false);
         } else {
-          const duration = animationClips[activeClipIndex]?.duration || 0;
-          if (!loopEnabled && duration > 0 && activeAction.time >= duration) activeAction.reset();
-          activeAction.paused = false;
-          activeAction.play();
+          const duration = getSelectedDuration();
+          if (!loopEnabled && duration > 0 && animationElapsed >= duration) {
+            activeActions.forEach((action) => action.reset());
+            animationElapsed = 0;
+          }
+          activeActions.forEach((action) => {
+            action.paused = false;
+            action.play();
+          });
+          isAnimationPlaying = true;
           setPlayButtonState(true);
         }
       });
 
       stopButton.addEventListener('click', () => {
-        if (!activeAction) return;
-        activeAction.stop();
-        activeAction.reset();
-        mixer.update(0);
+        activeActions.forEach((action) => { action.stop(); action.reset(); });
+        isAnimationPlaying = false;
+        animationElapsed = 0;
         setPlayButtonState(false);
         updateAnimationProgress();
       });
 
       clipSelect.addEventListener('change', () => {
-        playClip(Number(clipSelect.value), true);
+        playSelection(clipSelect.value === 'all' ? -1 : Number(clipSelect.value), true);
       });
 
       loopButton.addEventListener('click', () => {
@@ -1627,15 +1657,11 @@ controls.update();
 
       speedSelect.addEventListener('change', () => {
         playbackSpeed = Number(speedSelect.value) || 1;
-        if (activeAction) activeAction.timeScale = playbackSpeed;
+        activeActions.forEach((action) => { action.timeScale = playbackSpeed; });
       });
 
-      mixer.addEventListener('finished', (event) => {
-        if (event.action === activeAction && !loopEnabled) setPlayButtonState(false);
-      });
-
-      // Preserve the old viewer's autoplay behavior, but play one clip at a time.
-      playClip(0, true);
+      // Start with every imported animation running together by default.
+      playSelection(-1, true);
     }
   },
 
