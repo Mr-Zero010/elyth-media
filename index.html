@@ -1476,6 +1476,7 @@ function syncTransformControls() {
   } else {
     transformControls.detach();
   }
+  updateVisibleTransformGizmo();
 }
 
 function restorePausePoseBeforePlayback() {
@@ -1758,6 +1759,83 @@ transformControls.setMode('translate');
 // Make Blender-style axis arrows easier to see and keep them aligned to world axes.
 transformControls.setSpace('world');
 transformControls.setSize(1.35);
+
+// Elyth visible transform gizmo. The native r163 controls continue to handle
+// picking and dragging; this separate overlay guarantees clearly visible handles.
+const visibleTransformGizmo = new THREE.Group();
+visibleTransformGizmo.name = 'ElythVisibleTransformGizmo';
+visibleTransformGizmo.renderOrder = 9999;
+scene.add(visibleTransformGizmo);
+
+const makeGizmoMaterial = (color) => new THREE.MeshBasicMaterial({
+  color,
+  depthTest: false,
+  depthWrite: false,
+  toneMapped: false
+});
+const gizmoMaterials = {
+  x: makeGizmoMaterial(0xff3030),
+  y: makeGizmoMaterial(0x30e060),
+  z: makeGizmoMaterial(0x3285ff)
+};
+const moveGizmo = new THREE.Group();
+const rotateGizmo = new THREE.Group();
+visibleTransformGizmo.add(moveGizmo, rotateGizmo);
+
+function addVisibleAxisArrow(axis, material) {
+  const arrow = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.72, 10), material);
+  shaft.position.y = 0.36;
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.19, 14), material);
+  tip.position.y = 0.815;
+  arrow.add(shaft, tip);
+  if (axis === 'x') arrow.rotation.z = -Math.PI / 2;
+  if (axis === 'z') arrow.rotation.x = Math.PI / 2;
+  arrow.traverse((part) => {
+    if (part.isMesh) part.renderOrder = 9999;
+  });
+  moveGizmo.add(arrow);
+}
+
+function addVisibleRotationRing(axis, material) {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.012, 10, 112), material);
+  if (axis === 'x') ring.rotation.y = Math.PI / 2;
+  if (axis === 'y') ring.rotation.x = Math.PI / 2;
+  ring.renderOrder = 9999;
+  rotateGizmo.add(ring);
+}
+
+addVisibleAxisArrow('x', gizmoMaterials.x);
+addVisibleAxisArrow('y', gizmoMaterials.y);
+addVisibleAxisArrow('z', gizmoMaterials.z);
+addVisibleRotationRing('x', gizmoMaterials.x);
+addVisibleRotationRing('y', gizmoMaterials.y);
+addVisibleRotationRing('z', gizmoMaterials.z);
+
+const gizmoWorldPosition = new THREE.Vector3();
+const gizmoCameraPosition = new THREE.Vector3();
+function updateVisibleTransformGizmo() {
+  const active = selectedObjects.size > 0 && transformControls &&
+    transformControls.object && (!hasImportedAnimations || !isAnimationPlaying);
+  visibleTransformGizmo.visible = !!active;
+  if (!active) return;
+
+  transformPivot.updateMatrixWorld(true);
+  transformPivot.getWorldPosition(gizmoWorldPosition);
+  camera.getWorldPosition(gizmoCameraPosition);
+  visibleTransformGizmo.position.copy(gizmoWorldPosition);
+  visibleTransformGizmo.quaternion.identity();
+
+  // Keep the gizmo readable at different camera distances and model sizes.
+  const distance = gizmoWorldPosition.distanceTo(gizmoCameraPosition);
+  const screenScale = distance * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) * 1.9 * 1.35 / 4;
+  visibleTransformGizmo.scale.setScalar(Math.max(0.001, screenScale));
+
+  const rotating = transformControls.mode === 'rotate';
+  moveGizmo.visible = !rotating;
+  rotateGizmo.visible = rotating;
+}
+
 transformControls.addEventListener('dragging-changed', (event) => {
   controls.enabled = !event.value;
 });
@@ -1787,12 +1865,14 @@ transformControls.addEventListener('mouseUp', () => {
 transformMoveButton.addEventListener('click', () => {
   if (hasImportedAnimations && isAnimationPlaying) return;
   transformControls.setMode('translate');
+  updateVisibleTransformGizmo();
   transformMoveButton.classList.add('is-active');
   transformRotateButton.classList.remove('is-active');
 });
 transformRotateButton.addEventListener('click', () => {
   if (hasImportedAnimations && isAnimationPlaying) return;
   transformControls.setMode('rotate');
+  updateVisibleTransformGizmo();
   transformRotateButton.classList.add('is-active');
   transformMoveButton.classList.remove('is-active');
 });
@@ -2124,6 +2204,7 @@ controls.update();
   if (updateAnimationFrameUI) updateAnimationFrameUI(dt);
 
   controls.update();
+  updateVisibleTransformGizmo();
 
   renderer.render(scene, camera);
 }
@@ -2149,6 +2230,13 @@ controls.update();
     if (transformHelper && transformHelper.parent) {
       transformHelper.parent.remove(transformHelper);
       transformHelper = null;
+    }
+    if (visibleTransformGizmo) {
+      visibleTransformGizmo.traverse((part) => {
+        if (part.geometry) part.geometry.dispose();
+      });
+      Object.values(gizmoMaterials).forEach((material) => material.dispose());
+      if (visibleTransformGizmo.parent) visibleTransformGizmo.parent.remove(visibleTransformGizmo);
     }
 
     renderer.domElement.removeEventListener('pointerdown', rememberScenePointer);
