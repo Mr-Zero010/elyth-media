@@ -8,10 +8,10 @@
 <meta name="description" content="Watch tutorials and videos on MyVideo. Sign in, upload, follow creators, and discover content.">
 
 <style>
-  --bg:#ffffff;
 :root{
   --blue:#0be3ff;
   --muted:#6b7280;
+  --bg:#ffffff;
   --card:#fff;
   --radius:12px;
   --max-width:980px;
@@ -691,23 +691,15 @@ button{cursor:pointer}
   <small id="uploadStatus"></small>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.163.0/build/three.module.js"
-  }
-}
-</script>
-
 <script type="module">
-import * as THREE from "three";
+import * as THREE from "https://unpkg.com/three@0.163.0/build/three.module.js";
 
-import { OrbitControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js";
-import { TransformControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/TransformControls.js";
+import { OrbitControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module";
+import { TransformControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/TransformControls.js?module";
 
-import { GLTFLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module";
 
-import { DRACOLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/DRACOLoader.js";
+import { DRACOLoader } from "https://unpkg.com/three@0.163.0/examples/jsm/loaders/DRACOLoader.js?module";
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -1441,7 +1433,7 @@ transformToolbar.innerHTML = `
   <button type="button" id="transformMoveButton" class="is-active" title="Move selected object(s)">↔ Move</button>
   <button type="button" id="transformRotateButton" title="Rotate selected object(s)">⟳ Rotate</button>
   <button type="button" id="transformResetButton" title="Reset selected object(s) to their original transforms">Reset</button>
-  <span class="transform-hint">X red · Y green · Z blue</span>
+  <span class="transform-hint">Available while paused</span>
 `;
 container.appendChild(transformToolbar);
 const transformMoveButton = transformToolbar.querySelector('#transformMoveButton');
@@ -1763,9 +1755,6 @@ transformControls = new TransformControls(camera, renderer.domElement);
 transformHelper = transformControls;
 scene.add(transformControls);
 transformControls.setMode('translate');
-// Make Blender-style axis arrows easier to see and keep them aligned to world axes.
-transformControls.setSpace('world');
-transformControls.setSize(1.35);
 transformControls.addEventListener('dragging-changed', (event) => {
   controls.enabled = !event.value;
 });
