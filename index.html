@@ -241,6 +241,28 @@ button{cursor:pointer}
   overflow-wrap: anywhere;
 }
 
+.model-object-name {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background .12s ease, border-color .12s ease;
+}
+
+.model-object-name:hover {
+  background: #343434;
+}
+
+.model-object-name.is-selected {
+  background: rgba(11, 227, 255, .14);
+  border-color: var(--blue);
+  color: #fff;
+}
+
 @media (max-width: 600px) {
   #viewer3d {
     height: 420px;
@@ -999,10 +1021,14 @@ if (modelObjects.length === 0) {
   message.textContent = 'No named objects found';
   objectList.appendChild(message);
 } else {
-  modelObjects.forEach((object) => {
-    const item = document.createElement('div');
+  modelObjects.forEach((object, index) => {
+    const item = document.createElement('button');
+    item.type = 'button';
     item.className = 'model-object-name';
     item.textContent = object.name;
+    item.dataset.objectIndex = String(index);
+    item.setAttribute('aria-pressed', 'false');
+    item.title = 'Select ' + object.name;
     objectList.appendChild(item);
   });
 }
@@ -1117,6 +1143,127 @@ modelRoot.position.set(
 );
 
 scene.add(modelRoot);
+
+// OBJECT SELECTION: list-to-scene and scene-to-list.
+const raycaster = new THREE.Raycaster();
+const pointerNdc = new THREE.Vector2();
+let selectedObject = null;
+let selectedListItem = null;
+const originalMaterials = new Map();
+
+function restoreObjectHighlight() {
+  for (const [mesh, originalMaterial] of originalMaterials) {
+    mesh.material = originalMaterial;
+  }
+  originalMaterials.clear();
+}
+
+function highlightObject(object) {
+  object.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+
+    if (!originalMaterials.has(child)) {
+      originalMaterials.set(child, child.material);
+    }
+
+    const sourceMaterials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+
+    const highlightedMaterials = sourceMaterials.map((material) => {
+      const copy = material.clone();
+
+      if (copy.emissive && typeof copy.emissive.set === 'function') {
+        copy.emissive.set(0x00aeca);
+        copy.emissiveIntensity = Math.max(
+          Number(copy.emissiveIntensity) || 0,
+          0.45
+        );
+      } else if (copy.color && typeof copy.color.lerp === 'function') {
+        copy.color = copy.color.clone().lerp(new THREE.Color(0x00d8f5), 0.35);
+      }
+
+      return copy;
+    });
+
+    child.material = Array.isArray(child.material)
+      ? highlightedMaterials
+      : highlightedMaterials[0];
+  });
+}
+
+function selectModelObject(object) {
+  if (!object) return;
+
+  restoreObjectHighlight();
+  selectedObject = object;
+  highlightObject(object);
+
+  if (selectedListItem) {
+    selectedListItem.classList.remove('is-selected');
+    selectedListItem.setAttribute('aria-pressed', 'false');
+  }
+
+  selectedListItem = objectList.querySelector(
+    '.model-object-name[data-object-index="' + modelObjects.indexOf(object) + '"]'
+  );
+
+  if (selectedListItem) {
+    selectedListItem.classList.add('is-selected');
+    selectedListItem.setAttribute('aria-pressed', 'true');
+    selectedListItem.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+objectList.querySelectorAll('.model-object-name').forEach((item) => {
+  item.addEventListener('click', () => {
+    const object = modelObjects[Number(item.dataset.objectIndex)];
+    selectModelObject(object);
+  });
+});
+
+let scenePointerStart = null;
+
+const rememberScenePointer = (event) => {
+  scenePointerStart = { x: event.clientX, y: event.clientY };
+};
+
+const selectSceneObject = (event) => {
+  if (!scenePointerStart) return;
+
+  const moved = Math.hypot(
+    event.clientX - scenePointerStart.x,
+    event.clientY - scenePointerStart.y
+  );
+  scenePointerStart = null;
+
+  // Ignore orbit/pan gestures. Only a simple click selects an object.
+  if (moved > 5) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(pointerNdc, camera);
+  const hits = raycaster.intersectObject(modelRoot, true);
+  if (!hits.length) return;
+
+  let target = hits[0].object;
+  while (target && target !== modelRoot && !modelObjects.includes(target)) {
+    target = target.parent;
+  }
+
+  if (target && target !== modelRoot) {
+    selectModelObject(target);
+  }
+};
+
+renderer.domElement.addEventListener('pointerdown', rememberScenePointer);
+renderer.domElement.addEventListener('pointerup', selectSceneObject);
+renderer.domElement.addEventListener('pointercancel', () => {
+  scenePointerStart = null;
+});
+
 console.log("SCENE:", scene);
 console.log("MODEL:", modelRoot);
 console.log("MODEL CHILDREN:", modelRoot.children.length);
@@ -1220,6 +1367,10 @@ controls.update();
 
     window.removeEventListener('resize', onResize);
     document.removeEventListener('fullscreenchange', updateFullscreenButton);
+
+    renderer.domElement.removeEventListener('pointerdown', rememberScenePointer);
+    renderer.domElement.removeEventListener('pointerup', selectSceneObject);
+    restoreObjectHighlight();
 
     try {
 
