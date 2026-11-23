@@ -1433,7 +1433,7 @@ transformToolbar.innerHTML = `
   <button type="button" id="transformMoveButton" class="is-active" title="Move selected object(s)">↔ Move</button>
   <button type="button" id="transformRotateButton" title="Rotate selected object(s)">⟳ Rotate</button>
   <button type="button" id="transformResetButton" title="Reset selected object(s) to their original transforms">Reset</button>
-  <span class="transform-hint">Drag an axis arrow or rotation ring</span>
+  <span class="transform-hint">X red · Y green · Z blue</span>
 `;
 container.appendChild(transformToolbar);
 const transformMoveButton = transformToolbar.querySelector('#transformMoveButton');
@@ -1757,10 +1757,7 @@ scene.add(transformControls);
 transformControls.setMode('translate');
 // Make Blender-style axis arrows easier to see and keep them aligned to world axes.
 transformControls.setSpace('world');
-transformControls.setSize(2.4);
-transformControls.showX = true;
-transformControls.showY = true;
-transformControls.showZ = true;
+transformControls.setSize(1.35);
 transformControls.addEventListener('dragging-changed', (event) => {
   controls.enabled = !event.value;
 });
