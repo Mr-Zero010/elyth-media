@@ -352,6 +352,77 @@ button{cursor:pointer}
 
 
 
+
+/* Compact multi-object isolate control */
+#objectSelectionToolbar {
+  position: absolute;
+  z-index: 25;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 150px);
+  padding: 6px 9px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(20,20,20,.94);
+  box-shadow: 0 3px 14px rgba(0,0,0,.3);
+  font: 12px/1.2 Arial, sans-serif;
+}
+#objectSelectionToolbar.is-visible { display: flex; }
+#objectSelectionCount { white-space: nowrap; color: #ddd; }
+#hideRemainingToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #4a4a4a;
+  border-radius: 999px;
+  color: #fff;
+  background: #292929;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#hideRemainingToggle:hover { background: #383838; }
+#objectSelectionCount { cursor: help; }
+#hideRemainingToggle .isolate-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #777;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.08);
+}
+#hideRemainingToggle[aria-pressed="true"] {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+#hideRemainingToggle[aria-pressed="true"] .isolate-dot {
+  background: var(--blue);
+  box-shadow: 0 0 7px rgba(11,227,255,.8);
+}
+#clearObjectSelection {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #bbb;
+  background: transparent;
+  font: 16px/1 Arial, sans-serif;
+  cursor: pointer;
+}
+#clearObjectSelection:hover { color: #fff; background: #444; }
+.model-object-visibility:disabled { opacity: .35; cursor: not-allowed; }
+@media (max-width: 600px) {
+  #objectSelectionToolbar { top: 10px; max-width: calc(100% - 125px); gap: 6px; padding: 5px 7px; }
+  #objectSelectionCount { font-size: 11px; }
+  #hideRemainingToggle { padding: 5px 7px; font-size: 11px; }
+}
+
 /* Imported animation playback controls */
 #animationControls {
   position: absolute;
@@ -1274,9 +1345,26 @@ scene.add(modelRoot);
 // OBJECT SELECTION: list-to-scene and scene-to-list.
 const raycaster = new THREE.Raycaster();
 const pointerNdc = new THREE.Vector2();
-let selectedObject = null;
-let selectedListItem = null;
+const selectedObjects = new Set();
 const originalMaterials = new Map();
+let isolateSelectionEnabled = false;
+let visibilityBeforeIsolation = null;
+
+const selectionToolbar = document.createElement('div');
+selectionToolbar.id = 'objectSelectionToolbar';
+selectionToolbar.innerHTML = `
+  <span id="objectSelectionCount">1 selected</span>
+  <button type="button" id="hideRemainingToggle" aria-pressed="false" title="Hide all objects except the selected ones">
+    <span class="isolate-dot" aria-hidden="true"></span>
+    <span>Hide remaining</span>
+  </button>
+  <button type="button" id="clearObjectSelection" aria-label="Clear object selection" title="Clear selection">×</button>
+`;
+container.appendChild(selectionToolbar);
+const selectionCountLabel = selectionToolbar.querySelector('#objectSelectionCount');
+selectionCountLabel.title = 'Ctrl/⌘-click or Shift-click objects to add or remove them from the selection';
+const hideRemainingToggle = selectionToolbar.querySelector('#hideRemainingToggle');
+const clearObjectSelection = selectionToolbar.querySelector('#clearObjectSelection');
 
 function restoreObjectHighlight() {
   for (const [mesh, originalMaterial] of originalMaterials) {
@@ -1319,33 +1407,107 @@ function highlightObject(object) {
   });
 }
 
-function selectModelObject(object) {
-  if (!object) return;
-
-  restoreObjectHighlight();
-  selectedObject = object;
-  highlightObject(object);
-
-  if (selectedListItem) {
-    selectedListItem.classList.remove('is-selected');
-    selectedListItem.setAttribute('aria-pressed', 'false');
+function isSelectedOrAncestorOfSelection(object) {
+  for (const selected of selectedObjects) {
+    let node = selected;
+    while (node) {
+      if (node === object) return true;
+      node = node.parent;
+    }
   }
+  return false;
+}
 
-  selectedListItem = objectList.querySelector(
-    '.model-object-name[data-object-index="' + modelObjects.indexOf(object) + '"]'
-  );
+function updateIsolationVisibility() {
+  if (!isolateSelectionEnabled || !visibilityBeforeIsolation) return;
+  modelObjects.forEach((object) => {
+    const originalVisible = visibilityBeforeIsolation.get(object);
+    object.visible = Boolean(originalVisible && isSelectedOrAncestorOfSelection(object));
+    const row = objectList.querySelector('.model-object-row[data-object-index="' + modelObjects.indexOf(object) + '"]');
+    const eye = row?.querySelector('.model-object-visibility');
+    if (row) row.classList.toggle('is-hidden', !object.visible);
+    if (eye) {
+      eye.disabled = !isSelectedOrAncestorOfSelection(object);
+      eye.textContent = object.visible ? '◉' : '○';
+      eye.setAttribute('aria-pressed', String(object.visible));
+      eye.setAttribute('aria-label', (object.visible ? 'Hide ' : 'Show ') + object.name);
+      eye.title = object.visible ? 'Hide object' : 'Show object';
+    }
+  });
+}
 
-  if (selectedListItem) {
-    selectedListItem.classList.add('is-selected');
-    selectedListItem.setAttribute('aria-pressed', 'true');
-    selectedListItem.scrollIntoView({ block: 'nearest' });
+function setIsolationMode(enabled) {
+  if (enabled && selectedObjects.size === 0) return;
+  if (enabled && !visibilityBeforeIsolation) {
+    visibilityBeforeIsolation = new Map(modelObjects.map((object) => [object, object.visible]));
+  }
+  isolateSelectionEnabled = enabled;
+  if (enabled) {
+    updateIsolationVisibility();
+  } else if (visibilityBeforeIsolation) {
+    modelObjects.forEach((object) => {
+      object.visible = visibilityBeforeIsolation.get(object);
+      const index = modelObjects.indexOf(object);
+      const row = objectList.querySelector('.model-object-row[data-object-index="' + index + '"]');
+      const eye = row?.querySelector('.model-object-visibility');
+      if (row) row.classList.toggle('is-hidden', !object.visible);
+      if (eye) {
+        eye.disabled = false;
+        eye.textContent = object.visible ? '◉' : '○';
+        eye.setAttribute('aria-pressed', String(object.visible));
+        eye.setAttribute('aria-label', (object.visible ? 'Hide ' : 'Show ') + object.name);
+        eye.title = object.visible ? 'Hide object' : 'Show object';
+      }
+    });
+    visibilityBeforeIsolation = null;
+  }
+  hideRemainingToggle.setAttribute('aria-pressed', String(enabled));
+  hideRemainingToggle.title = enabled
+    ? 'Show all objects again'
+    : 'Hide all objects except the selected ones';
+}
+
+function refreshObjectSelection(scrollToLast = false) {
+  restoreObjectHighlight();
+  modelObjects.forEach((object, index) => {
+    const item = objectList.querySelector('.model-object-name[data-object-index="' + index + '"]');
+    if (!item) return;
+    const selected = selectedObjects.has(object);
+    item.classList.toggle('is-selected', selected);
+    item.setAttribute('aria-pressed', String(selected));
+    if (selected) highlightObject(object);
+  });
+
+  selectionToolbar.classList.toggle('is-visible', selectedObjects.size > 0);
+  selectionCountLabel.textContent = selectedObjects.size + (selectedObjects.size === 1 ? ' selected' : ' selected');
+  if (scrollToLast && selectedObjects.size) {
+    const last = Array.from(selectedObjects).at(-1);
+    const item = objectList.querySelector('.model-object-name[data-object-index="' + modelObjects.indexOf(last) + '"]');
+    item?.scrollIntoView({ block: 'nearest' });
+  }
+  if (selectedObjects.size === 0 && isolateSelectionEnabled) {
+    setIsolationMode(false);
+  } else if (isolateSelectionEnabled) {
+    updateIsolationVisibility();
   }
 }
 
+function selectModelObject(object, additive = false) {
+  if (!object) return;
+  if (additive) {
+    if (selectedObjects.has(object)) selectedObjects.delete(object);
+    else selectedObjects.add(object);
+  } else {
+    selectedObjects.clear();
+    selectedObjects.add(object);
+  }
+  refreshObjectSelection(true);
+}
+
 objectList.querySelectorAll('.model-object-name').forEach((item) => {
-  item.addEventListener('click', () => {
+  item.addEventListener('click', (event) => {
     const object = modelObjects[Number(item.dataset.objectIndex)];
-    selectModelObject(object);
+    selectModelObject(object, event.ctrlKey || event.metaKey || event.shiftKey);
   });
 });
 
@@ -1356,15 +1518,30 @@ objectList.querySelectorAll('.model-object-visibility').forEach((button) => {
     const row = button.closest('.model-object-row');
     if (!object || !row) return;
 
-    object.visible = !object.visible;
-    const isVisible = object.visible;
-
-    button.textContent = isVisible ? '◉' : '○';
-    button.setAttribute('aria-pressed', String(isVisible));
-    button.setAttribute('aria-label', (isVisible ? 'Hide ' : 'Show ') + object.name);
-    button.title = isVisible ? 'Hide object' : 'Show object';
-    row.classList.toggle('is-hidden', !isVisible);
+    const nextVisible = !(isolateSelectionEnabled && visibilityBeforeIsolation
+      ? visibilityBeforeIsolation.get(object)
+      : object.visible);
+    if (isolateSelectionEnabled && visibilityBeforeIsolation) {
+      visibilityBeforeIsolation.set(object, nextVisible);
+      updateIsolationVisibility();
+    } else {
+      object.visible = nextVisible;
+      button.textContent = nextVisible ? '◉' : '○';
+      button.setAttribute('aria-pressed', String(nextVisible));
+      button.setAttribute('aria-label', (nextVisible ? 'Hide ' : 'Show ') + object.name);
+      button.title = nextVisible ? 'Hide object' : 'Show object';
+      row.classList.toggle('is-hidden', !nextVisible);
+    }
   });
+});
+
+hideRemainingToggle.addEventListener('click', () => {
+  setIsolationMode(!isolateSelectionEnabled);
+});
+
+clearObjectSelection.addEventListener('click', () => {
+  selectedObjects.clear();
+  refreshObjectSelection();
 });
 
 let scenePointerStart = null;
@@ -1406,7 +1583,7 @@ const selectSceneObject = (event) => {
   }
 
   if (target && target !== modelRoot) {
-    selectModelObject(target);
+    selectModelObject(target, event.ctrlKey || event.metaKey || event.shiftKey);
   }
 };
 
